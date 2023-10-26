@@ -1,30 +1,33 @@
-var fragmentShader =`
+var fragmentShader =`#version 300 es
 precision lowp float;
-varying vec4 v_fColor;
-// varying vec4 v_position;
-varying mat4 v_model_matrix;
-varying vec3 v_fNormals;
-varying float v_normalToCamera;
-varying vec2 v_texcoord;
-varying vec3 v_cameraRotation;
-varying mat3 v_TBN;
+in vec4 v_position;
+// in mat4 v_model_matrix;
+in vec3 v_fNormals;
+in float v_normalToCamera;
+in vec2 v_texcoord;
+in vec3 v_cameraRotation;
+in mat3 v_TBN;
+in vec4 v_fColor;
 uniform sampler2D u_normal_texture;
 uniform sampler2D u_height_map_texture;
 uniform sampler2D u_color_texture;
 
-varying float v_temp_use_the_oclussion;
+float v_temp_use_the_oclussion;
 
-mat3 projection_matrix(vec3 vector) {
-    return mat3(
-        vector.x * vector.x, vector.x * vector.y, vector.x * vector.z,
-        vector.y * vector.x, vector.y * vector.y, vector.y * vector.z,
-        vector.z * vector.x, vector.z * vector.y, vector.z * vector.z
-    );
-}
+in vec3 v_fragment_position;
+
+in mat4 v_model_matrix;
+in mat4 v_camera_matrix;
+in mat4 v_view_matrix;
+in mat4 v_projection_matrix;
+in mat4 v_world_view_projection;
+in mat4 v_world_inverse_transpose;
+
+out vec4 output_FragColor;
 
 void main(){
     //apparent height under the cursor 
-    float height = texture2D(u_height_map_texture, v_texcoord).r;
+    float height = texture(u_height_map_texture, v_texcoord).r;
     
     //max height is 0 distance from the surface. - it's equivalent to pure white (1.0)
     //min height - max_parallax is the distance from the surface in it's normal direction - it's equivalent to pure black (0.0)
@@ -34,26 +37,15 @@ void main(){
     // height = 1.0 - height;
     height *= max_parallax;
     vec2 texcoord = v_texcoord;
-    mat3 tangent_projection = projection_matrix(normalize(v_TBN[0]));
-    mat3 bitangent_projection = projection_matrix(normalize(v_TBN[1]));
-    mat3 normal_projection = projection_matrix(normalize(v_TBN[2]));
-    //check if length face forwards or backwards
-    vec3 projected_camera = vec3(
-        mat3(v_model_matrix) * v_TBN[0],
-        mat3(v_model_matrix) * v_TBN[1],
-        mat3(v_model_matrix) * v_TBN[2]
-        // -length(mat3(v_model_matrix) * v_TBN[0]) * faceforward(vec3(1), mat3(v_model_matrix) * v_TBN[0], v_TBN[0]).x,
-        // length(mat3(v_model_matrix) * v_TBN[1]) * faceforward(vec3(1), mat3(v_model_matrix) * v_TBN[1], v_TBN[1]).x,
-        // length(mat3(v_model_matrix) * v_TBN[2]) * faceforward(vec3(1), mat3(v_model_matrix) * v_TBN[2], v_TBN[2]).x
-        // -length(tangent_projection * v_cameraRotation) * faceforward(vec3(1), tangent_projection * v_cameraRotation, v_TBN[0]).x,
-        // length(bitangent_projection * v_cameraRotation) * faceforward(vec3(1), bitangent_projection * v_cameraRotation, v_TBN[1]).x,
-        // length(normal_projection * v_cameraRotation) * faceforward(vec3(1), normal_projection * v_cameraRotation, v_TBN[2]).x
-    );
 
-    projected_camera = projected_camera / projected_camera.z; //tangentz is 1 unit in length
-    projected_camera = normalize(projected_camera);
-
-    vec2 delta_uv = vec2(tan(asin(projected_camera.x)), tan(asin(projected_camera.y))) * step_height;
+    vec3 view_position = vec3(0., 0., 0.);
+    // vec3 view_position = v_view_matrix[3].xyz;
+    vec3 frag_position = vec3(v_position);
+    // vec3 view_direction = normalize(vec3(v_camera_matrix[3].xyz)) *  v_TBN;
+    vec3 view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) *  v_TBN;
+    vec2 delta_uv = view_direction.xy * step_height / -view_direction.z;
+    //https://apoorvaj.io/exploring-bump-mapping-with-webgl/
+    // vec2 delta_uv = vec2(0., 0.);
 
     float accumulator = 0.;
     float point_of_crossing;
@@ -61,11 +53,11 @@ void main(){
     for (int i = 0; i < number_of_iterations; i++) {
         accumulator += step_height;
         texcoord += delta_uv;
-        height = texture2D(u_height_map_texture, texcoord).r;
+        height = texture(u_height_map_texture, texcoord).r;
         height *= max_parallax;
         if (height < accumulator) {
             prev_texcoord = texcoord - delta_uv;
-            float prev_height = texture2D(u_height_map_texture, prev_texcoord).r;
+            float prev_height = texture(u_height_map_texture, prev_texcoord).r;
             
             prev_height *= max_parallax;
 
@@ -86,30 +78,26 @@ void main(){
     
     //texcoord is visible by the viewer. vtexcoord is the orginal
     
-	vec3 normals = texture2D(u_normal_texture, texcoord).rgb;
+	vec3 normals = texture(u_normal_texture, texcoord).rgb;
 	normals = normalize(normals * 2.0 - 1.0);
-	normals = normalize(v_TBN * normals);
+	normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * normals);
     // float normalToCamera = dot(normals, v_cameraRotation);
-    float normalToCamera = dot(normals, v_cameraRotation);
+    //change to lighting direction later
+    
+    float normalToCamera = dot(normals, normalize(-v_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normals, normalize(vec3(0., 0., 1.) * mat3(v_projection_matrix * v_view_matrix)));
 
-	// /* 
-	// vec3 normals = 5.*(texture2D(u_normal_texture, texcoord).rgb - vec3(0.5, 0.5, 1.0));
-	// float normalToCamera = 1.0 - acos(
-    //     dot(v_fNormals.xyz + normals, v_cameraRotation) / ((length(v_fNormals.xyz + normals)*length(v_cameraRotation)))
-    //     // dot(normalize(v_fNormals.xyz), normalize(v_cameraRotation))
-    // );
-    // */
+	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
+	// output_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
 
-	// gl_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
-	// gl_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
-
-	// gl_FragColor = vec4(vec3(height)*normalToCamera, 1);
-	gl_FragColor = vec4(texture2D(u_color_texture, texcoord).rgb*normalToCamera, 1);
-	// gl_FragColor = vec4(texture2D(u_height_map_texture, texcoord).rgb*normalToCamera, 1);
-	// gl_FragColor = vec4(texture2D(u_normal_texture, texcoord).rgb*normalToCamera, 1);
-	// gl_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
-	// gl_FragColor = vec4(texture2D(u_normal_texture, texcoord).rgb*(0.5 + normalToCamera/2.0), 1);
-	//gl_FragColor = texture2D(u_normal_texture, texcoord);
-	//vec3 basic = texture2D(u_normal_texture, texcoord).rgb*(0.5 + v_normalToCamera);
-	//gl_FragColor = vec4(basic.rgb + v_position.xyz, 1);
+	// output_FragColor = vec4(vec3(height)*normalToCamera, 1);
+	// output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
+	output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
+	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb*normalToCamera, 1);
+	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*normalToCamera, 1);
+	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
+	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*(0.5 + normalToCamera/2.0), 1);
+	// output_FragColor = texture(u_normal_texture, texcoord);
+	//vec3 basic = texture(u_normal_texture, texcoord).rgb*(0.5 + v_normalToCamera);
+	// output_FragColor = vec4(basic.rgb + v_position.xyz, 1);
 }`

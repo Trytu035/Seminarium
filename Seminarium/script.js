@@ -3,7 +3,7 @@
 function main() {
     /** @type {HTMLCanvasElement} */
     let canvas = document.getElementById("canvas"); //canvas
-    let gl = canvas.getContext("webgl");
+    let gl = canvas.getContext("webgl2");
     init(canvas, gl);
     //createTexture("./footprint.png", (retErr, retVal) => {
     //    console.log(retVal);
@@ -204,9 +204,6 @@ function init(canvas, gl) {
             normals[(i2*3 + i) * 3]     = edge1.y*edge2.z - edge1.z*edge2.y;
             normals[(i2*3 + i) * 3 + 1] = edge1.z*edge2.x - edge1.x*edge2.z;
             normals[(i2*3 + i) * 3 + 2] = edge1.x*edge2.y - edge1.y*edge2.x;
-            // normals[(i2*3 + i) * 3]     = (positions[(i2 * 3 + 2) * 3 + 1] - positions[(i2 * 3 + 1) * 3 + 1]) * (positions[(i2 * 3 + 0) * 3 + 2] - positions[(i2 * 3 + 1) * 3 + 2]) - (positions[(i2 * 3 + 2) * 3 + 2] - positions[(i2 * 3 + 1) * 3 + 2]) * (positions[(i2 * 3 + 0) * 3 + 1] - positions[(i2 * 3 + 1) * 3 + 1]);
-            // normals[(i2*3 + i) * 3 + 1] = (positions[(i2 * 3 + 2) * 3 + 2] - positions[(i2 * 3 + 1) * 3 + 2]) * (positions[(i2 * 3 + 0) * 3 + 0] - positions[(i2 * 3 + 1) * 3 + 0]) - (positions[(i2 * 3 + 2) * 3 + 0] - positions[(i2 * 3 + 1) * 3 + 0]) * (positions[(i2 * 3 + 0) * 3 + 2] - positions[(i2 * 3 + 1) * 3 + 2]);
-            // normals[(i2*3 + i) * 3 + 2] = (positions[(i2 * 3 + 2) * 3 + 0] - positions[(i2 * 3 + 1) * 3 + 0]) * (positions[(i2 * 3 + 0) * 3 + 1] - positions[(i2 * 3 + 1) * 3 + 1]) - (positions[(i2 * 3 + 2) * 3 + 1] - positions[(i2 * 3 + 1) * 3 + 1]) * (positions[(i2 * 3 + 0) * 3 + 0] - positions[(i2 * 3 + 1) * 3 + 0]);
         }
     }
     console.log(normals);
