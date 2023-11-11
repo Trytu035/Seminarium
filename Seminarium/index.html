@@ -2,9 +2,16 @@
 <html>
 <head>
     <style>
-        body{
+        body {
             margin: 0;
-            overflow: hidden;
+            /*overflow: hidden;*/
+        }
+        .hidden {
+            visibility: hidden;
+            position: absolute;
+            height: 100px;
+            width: 100px;
+            top: 0px;
         }
     </style>
 </head>
@@ -12,15 +19,16 @@
     <canvas id="canvas"></canvas>
     <script src="vector.js"></script>
     <script id="shader-interface" src="shader_interface.js"></script>
+
     <!--main shaders-->
     <script id="vertex-shader" src="vertex_shader.js"></script>
     <script id="fragment-shader" src="fragment_shader.js"></script>
+
     <!--shaders generating normal texture-->
     <script id="vertex-shader-normals" src="vertex_shader_render_normals_from_height_map.js"></script>
     <script id="fragment-shader-normals" src="fragment_shader_render_normals_from_height_map.js"></script>
+    <script src="render_normals_from_height_map.js"></script>
     <script src="script.js"></script>
-<!--    <script src="script2.js"></script>-->
-    <img src="footprint.png" />
-<!--    <img src="normal.png" />-->
+<!--    <img src="footprint.png" class="hidden"/>-->
 </body>
 </html>

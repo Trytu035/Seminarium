@@ -10,7 +10,6 @@ out vec2 v_texcoord;
 	out vec3 v_fNormals;
 	uniform vec2 u_mouse;
 	uniform vec2 u_rotate;
-	uniform vec3 u_cameraRotation;  //useless
 	uniform vec2 u_displayProportion;
 	uniform float u_distance;
 	out float v_distance;
@@ -24,7 +23,6 @@ out vec2 v_texcoord;
 	out mat4 v_world_inverse_transpose;
 	
 	out float v_normalToCamera;
-	out vec3 v_cameraRotation;  //useless
 	out mat3 v_TBN;
 	
 	out vec3 v_fragment_position;
@@ -58,7 +56,6 @@ out vec2 v_texcoord;
 		v_world_inverse_transpose = transpose(inverse(v_model_matrix));
 		
 		v_distance = u_distance;
-		v_cameraRotation = u_cameraRotation;
 		v_fNormals = a_normals;
 	
 	//https://www.youtube.com/watch?time_continue=269&v=EpADhkiJkJA&embeds_referring_euri=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dparalax%2Bmapping%2Bimplementation%2Bopengl%26sca_esv%3D576631001%26sxsrf%3DAM9HkKmHyi5MKpR1r8D8c_UJGQn5A5YVxA&source_ve_path=MTM5MTE3LDEzOTExNywyODY2Ng&feature=emb_logo&ab_channel=thebennybox
@@ -66,7 +63,7 @@ out vec2 v_texcoord;
 		vec3 t = normalize((v_world_inverse_transpose * vec4(a_tangents, 0.0)).xyz);
 		t = normalize(t - dot(t, n) * n);
 		vec3 b = cross(t, n);
-		v_TBN = mat3(t, b, n);
+		v_TBN = mat3(t, b, -n);
 		// v_TBN = inverse(transpose(v_TBN));
 
     	v_fragment_position = v_TBN * vec3(v_model_matrix * a_position);
