@@ -1,12 +1,10 @@
 var vertexShader = `#version 300 es
 	in vec4 a_position;
-	//in vec3 a_color;
 	in vec3 a_tangents;
 	in vec3 a_bitangents;
 	in vec3 a_normals;
 in vec2 a_texcoord;
 out vec2 v_texcoord;
-	out vec4 v_fColor;
 	out vec3 v_fNormals;
 	uniform vec2 u_mouse;
 	uniform vec2 u_rotate;
@@ -22,7 +20,6 @@ out vec2 v_texcoord;
 	out mat4 v_world_view_projection;
 	out mat4 v_world_inverse_transpose;
 	
-	out float v_normalToCamera;
 	out mat3 v_TBN;
 	
 	out vec3 v_fragment_position;
@@ -46,9 +43,13 @@ out vec2 v_texcoord;
 		vec3 rotate = vec3(u_rotate.yx, 0.0);
 		
 	    v_model_matrix = mat4(1);
-	    v_camera_matrix = rotate_y(rotate.y) * rotate_x(rotate.x) ;
+	    v_camera_matrix = rotate_y(rotate.y) * rotate_x(rotate.x);
 	    // v_camera_matrix *= translate(0., 0., 0.);
 	    v_camera_matrix *= translate(0., 0., u_distance);
+	    v_camera_matrix[2].xyz = normalize(v_camera_matrix[3].xyz);
+	    v_camera_matrix[1].xyz = vec3(0.0, 1.0, 0.0);
+	    v_camera_matrix[0].xyz = normalize(cross(v_camera_matrix[1].xyz, v_camera_matrix[2].xyz));
+	    v_camera_matrix[1].xyz = normalize(cross(v_camera_matrix[2].xyz, v_camera_matrix[0].xyz));
 	    v_view_matrix = inverse(v_camera_matrix);
 	    v_projection_matrix = perspective(0.01, 10.0, u_displayProportion.x / u_displayProportion.y);
 	    
@@ -59,11 +60,23 @@ out vec2 v_texcoord;
 		v_fNormals = a_normals;
 	
 	//https://www.youtube.com/watch?time_continue=269&v=EpADhkiJkJA&embeds_referring_euri=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dparalax%2Bmapping%2Bimplementation%2Bopengl%26sca_esv%3D576631001%26sxsrf%3DAM9HkKmHyi5MKpR1r8D8c_UJGQn5A5YVxA&source_ve_path=MTM5MTE3LDEzOTExNywyODY2Ng&feature=emb_logo&ab_channel=thebennybox
-		vec3 n = normalize((v_world_inverse_transpose * vec4(a_normals, 0.0)).xyz);
+	// 	vec3 n = normalize((v_world_inverse_transpose * vec4(a_normals, 0.0)).xyz);
 		vec3 t = normalize((v_world_inverse_transpose * vec4(a_tangents, 0.0)).xyz);
-		t = normalize(t - dot(t, n) * n);
-		vec3 b = cross(t, n);
-		v_TBN = mat3(t, b, -n);
+		vec3 b = normalize((v_world_inverse_transpose * vec4(a_bitangents, 0.0)).xyz);
+		// t = normalize(t - dot(t, n) * n);
+		b = normalize(b - dot(b, t) * t);
+		// vec3 b = cross(n, t);	//b = cross(n, t)
+		
+		// i, j, k
+		// nx ny nz
+		// tx ty tz
+		//
+		// b = i(ny*tz - nz+ty) - j(nz*tx - nx*tz) + k*(nx*ty - ny*tx)
+		//
+		// n = 
+		
+		vec3 n = cross(b, t);
+		v_TBN = mat3(t, b, n);
 		// v_TBN = inverse(transpose(v_TBN));
 
     	v_fragment_position = v_TBN * vec3(v_model_matrix * a_position);

@@ -33,6 +33,7 @@ void main(){
     vec3 vb = normalize(vec3(0.0, 2.0, 8.*8.*u_slope_strength * (s12-s10)));   //y
     vec4 bump = vec4( normalize(cross(va,vb)), height );
     
+    //https://stackoverflow.com/questions/5281261/generating-a-normal-map-from-a-height-map
     float s0 = textureOffset(u_height_map_texture, v_texcoord, ivec2(-1, -1)).x;
     float s1 = textureOffset(u_height_map_texture, v_texcoord, ivec2( 0, -1)).x;
     float s2 = textureOffset(u_height_map_texture, v_texcoord, ivec2( 1, -1)).x;
@@ -44,8 +45,10 @@ void main(){
     float s8 = textureOffset(u_height_map_texture, v_texcoord, ivec2( 1,  1)).x;
     
     vec3 n;
-    n.x = u_slope_strength * (s2 - s0 + 2.*(s5 - s3) + s8 - s6);
-    n.y = u_slope_strength * -(s6 - s0 + 2.*(s7 - s1) + s8 - s2);
+    n.x = u_slope_strength * (s2 - s0 + 1.4*(s5 - s3) + s8 - s6);
+    n.y = u_slope_strength * -(s6 - s0 + 1.4*(s7 - s1) + s8 - s2);
+    // n.x = u_slope_strength * (s2 - s0 + 2.0*(s5 - s3) + s8 - s6);
+    // n.y = u_slope_strength * -(s6 - s0 + 2.0*(s7 - s1) + s8 - s2);
     n.z = 1.0;
     n = normalize(n);
     

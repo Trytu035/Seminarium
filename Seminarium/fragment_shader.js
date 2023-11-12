@@ -41,11 +41,11 @@ void main(){
     height *= max_parallax;
     vec2 texcoord = v_texcoord;
 
-    vec3 view_position = vec3(0., 0., 0.);
-    // vec3 view_position = v_view_matrix[3].xyz;
+    // vec3 view_position = vec3(0., 0., 0.);
+    vec3 view_position = v_view_matrix[3].xyz;
     vec3 frag_position = vec3(v_position);
-    // vec3 view_direction = normalize(vec3(v_camera_matrix[3].xyz)) *  v_TBN;
-    vec3 view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) *  v_TBN;
+    // vec3 view_direction = normalize(vec3(v_camera_matrix[3].xyz)) * v_TBN;
+    vec3 view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) * v_TBN;
     vec2 delta_uv = view_direction.xy * step_height / -view_direction.z;
     //https://apoorvaj.io/exploring-bump-mapping-with-webgl/
     // vec2 delta_uv = vec2(0., 0.);
@@ -89,9 +89,9 @@ void main(){
 	normals = normalize(vec3(rotate_z(phi) * rotate_y(theta) * rotate_z(-phi) * vec4(normals, 0.0)));
 	// normals = vec3(normals.x, normals.y, clamp(normals.z, 0., 1.));  //clamp z
 	
-	normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * normals);
+	normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * normals );
     
-    float normalToCamera = dot(normals, normalize(-v_camera_matrix[2].xyz));
+    float normalToCamera = dot(normals, normalize(v_camera_matrix[2].xyz));
     // float normalToCamera = dot(normals, normalize(vec3(0., 0., 1.) * mat3(v_projection_matrix * v_view_matrix)));
 
 	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
@@ -104,8 +104,10 @@ void main(){
 	
 	// if (v_temp_use_the_oclussion > 0.5) {
 	//     output_FragColor = vec4(normalize(v_TBN[2]) /2. + 0.5, 1);
+	    // output_FragColor = vec4(normalize(v_TBN * normals) /2. + 0.5, 1);
 	// }else {
-	    output_FragColor = vec4(normalize(normals * v_TBN) /2. + 0.5, 1);
+	    output_FragColor = vec4(normalize(normals.rgb) / 2. + 0.5, 1);
+	    // output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb, 1);
 	// }
 	
 	// output_FragColor = vec4(normalize(normals * v_TBN) /2. + 0.5, 1);
