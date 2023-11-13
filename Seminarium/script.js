@@ -35,12 +35,32 @@ let cameraRotationUniformLocation;
 let displayProportionUniformLocation;
 let distanceUniformLocation;
 let texcoordAttributeLocation;
+let texcoordScaleAttributeLocation;
 let normalTextureLocation;
 let heightMapTextureLocation;
 let colorTextureLocation;
 let normalDetailTextureLocation;
 
+
+let _positionAttributeLocation;
+let _colorAttributeLocation;
+let _tangentsAttributeLocation;
+let _bitangentsAttributeLocation;
+let _normalsAttributeLocation;
+let _mouseUniformLocation;
+let _rotateUniformLocation;
+let _cameraRotationUniformLocation;
+let _displayProportionUniformLocation;
+let _distanceUniformLocation;
+let _texcoordAttributeLocation;
+let _normalTextureLocation;
+let _heightMapTextureLocation;
+let _colorTextureLocation;
+let _normalDetailTextureLocation;
+
 let mainVAO; // Vertex Attribute Object
+let lambertianVAO;
+let depthVAO;
 
 let glInfo = {
     gl: undefined,
@@ -48,37 +68,58 @@ let glInfo = {
     texturesArray: [],
 }
 
+class Model {
+    constructor(material) {
+        this.positions = [];
+        this.texcoords = [];
+        this.tangents = [];
+        this.bitangents = [];
+        this.normals = [];
+        this.material = material;
+        this.mvp = [];
+        this.VAO = material.gl.createVertexArray();
+        this.attributeLocation;
+    }
+}
+class Material {
+    constructor(glContext, vertexShader, fragmentShader) {
+        this.gl = glContext;
+        this.program = createProgram(
+            glContext,
+            createShader(glContext, vertexShader, glContext.VERTEX_SHADER),
+            createShader(glContext, fragmentShader, glContext.FRAGMENT_SHADER)
+        );
+    }
+}
+
 let temporaryLocation_1;
-// Format: - remember that points should turn anti-clockwise
+// Positions format: - remember that points should turn anti-clockwise
 // x1, y1, z1
 // x2, y2, z2
 // x3, y3, z3
-// x4, y4, z4
 // x1, y1, z1
 // x3, y3, z3
-let positions = [
-    // //Z face
-    // -1,  1+-1,  1,
-    //  1,  1+-1,  1,
-    //  1,  1+ 1,  1,
-    // -1,  1+ 1,  1,
-    // -1,  1+-1,  1,
-    //  1,  1+ 1,  1,
-    // -1,  0,  1,
-    // -1,  2,  1,
-    //  1,  2,  1,
-    //  1,  0,  1,
-    // -1,  0,  1,
-    //  1,  2,  1,
-
-]
-let texcoords = [
-    // 0, 0,    0, 2,    2, 2,  //check this out
-    // 2, 0,    0, 0,    2, 2,
-]
+// x4, y4, z4
+let positions = []
+// Texcoords format:
+// u1, v1
+// u2, v2
+// u3, v3
+// u1, v1
+// u3, v3
+// u4, v4
+let texcoords = []
+let textureScales = [];
 let tangents = [];
 let bitangents = [];
 let normals = [];
+
+//for models using lambertian lighting shader material
+let positionsLambertian = []
+let texcoordsLambertian = []
+let tangentsLambertian = [];
+let bitangentsLambertian = [];
+let normalsLambertian = [];
 
 function radToDeg(value) {
     return value / Math.PI * 180
@@ -86,10 +127,10 @@ function radToDeg(value) {
 function degToRad(value) {
     return value / 180 * Math.PI;
 }
-//tangent - red X   -down/up
-//bitangent - green Y   -left/right
+//tangent - red X   -left/right
+//bitangent - green Y   -down/up
 //normal - blue Z
-function generateFace(positionsArray, position, texcoordArray, tangent, bitangent, size_x, size_y, scale=1, swap_xy = 0) {
+function generateFace(positionsArray, position, texcoordArray, tangent, bitangent, size_x, size_y, scale=1, swap_xy = 0, invert_normal = 0) {
     tangent.normalize();
     bitangent.normalize();
     size_x /= 2;
@@ -101,9 +142,9 @@ function generateFace(positionsArray, position, texcoordArray, tangent, bitangen
         position.z - tangent.z*size_x + bitangent.z*size_y,
     );
     let P2 = new Vector3(
-        position.x + tangent.x*size_x + bitangent.x*size_y,
-        position.y + tangent.y*size_x + bitangent.y*size_y,
-        position.z + tangent.z*size_x + bitangent.z*size_y,
+        position.x - tangent.x*size_x - bitangent.x*size_y,
+        position.y - tangent.y*size_x - bitangent.y*size_y,
+        position.z - tangent.z*size_x - bitangent.z*size_y,
     );
     let P3 = new Vector3(
         position.x + tangent.x*size_x - bitangent.x*size_y,
@@ -111,32 +152,40 @@ function generateFace(positionsArray, position, texcoordArray, tangent, bitangen
         position.z + tangent.z*size_x - bitangent.z*size_y,
     );
     let P4 = new Vector3(
-        position.x - tangent.x*size_x - bitangent.x*size_y,
-        position.y - tangent.y*size_x - bitangent.y*size_y,
-        position.z - tangent.z*size_x - bitangent.z*size_y,
+        position.x + tangent.x*size_x + bitangent.x*size_y,
+        position.y + tangent.y*size_x + bitangent.y*size_y,
+        position.z + tangent.z*size_x + bitangent.z*size_y,
     );
     positionsArray.push(...P1.toArray());
     positionsArray.push(...P2.toArray());
     positionsArray.push(...P3.toArray());
-    positionsArray.push(...P4.toArray());
     positionsArray.push(...P1.toArray());
     positionsArray.push(...P3.toArray());
-    // positionsArray.push(...P2.toArray());
-    // positionsArray.push(...P1.toArray());
-    // positionsArray.push(...P4.toArray());
-    // positionsArray.push(...P3.toArray());
-    // positionsArray.push(...P2.toArray());
-    // positionsArray.push(...P4.toArray());
-    texcoordArray.push(
-         1      * scale,    1      * scale,
-         1      * scale,    0      * scale,
-         0      * scale,    0      * scale,
-         0      * scale,    1      * scale,
-         1      * scale,    1      * scale,
-         0      * scale,    0      * scale,
-    );
+    positionsArray.push(...P4.toArray());
+    if (swap_xy) {
+        texcoordArray.push(
+            size_y * scale, 0      * scale,
+            0      * scale, 0      * scale,
+            0      * scale, size_x * scale,
+            size_y * scale, 0      * scale,
+            0      * scale, size_x * scale,
+            size_y * scale, size_x * scale,
+        );
+    } else {
+        texcoordArray.push(
+            0      * scale, size_y * scale,
+            0      * scale, 0      * scale,
+            size_x * scale, 0      * scale,
+            0      * scale, size_y * scale,
+            size_x * scale, 0      * scale,
+            size_x * scale, size_y * scale,
+        );
+    }
 }
 
+let program;
+let program2;
+let program3;
 async function init(canvas, gl) {
     {
         generateFace(
@@ -146,89 +195,117 @@ async function init(canvas, gl) {
         );
         generateFace(
             positions, new Vector3(0, 4, 0),
-            texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, 1),
+            texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, -1),
             2, 2
         );
         generateFace(   // Y face (middle) bottom
             positions, new Vector3(0, 0, 0),
-            texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, -1),
-            2, 2
+            texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, 1),
+            4, 4, 1
         );
         generateFace(   //Z face back
             positions, new Vector3(0, 1, -1),
-            texcoords, new Vector3(0, 1, 0), new Vector3(-1, 0, 0),
-            2, 2, 1
-            // texcoords, new Vector3(0, 1, 0), new Vector3(-1, 0, 0),
+            texcoords, new Vector3(-1, 0, 0), new Vector3(0, 1, 0),
+            4, 4, 1
+            // texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
             // 2, -2, 1, 1
         );
         generateFace(   //X face back
             positions, new Vector3(-1, 1, 0),
-            texcoords, new Vector3(0, 1, 0), new Vector3(0, 0, 1), //inversed
+            texcoords, new Vector3(0, 0, 1), new Vector3(0, 1, 0), //inversed
             2, 2, 1
         );
         generateFace(   //Z face front
             positions, new Vector3(0, 1, 1),
-            texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
+            texcoords, new Vector3(1, 0, 0), new Vector3(0, 1, 0),
             2, 2, 1
-            // texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
+            // texcoords, new Vector3(0, -1, 0), new Vector3(1, 0, 0),
             // 2, -2, 1, 1
         );
         generateFace(   //X face front
             positions, new Vector3(1, 1, 0),
-            texcoords, new Vector3(0, 1, 0), new Vector3(0, 0, -1),
+            texcoords, new Vector3(0, 0, -1), new Vector3(0, 1, 0),
             2, 2, 1
         );
 
-        // generateFace(
-        //     positions, new Vector3(2, 2, 0),
-        //     texcoords, new Vector3(-1, 1, 1), new Vector3(1, 1, 1),
-        //     2, 2, 1
-        // );
-        // generateFace(
-        //     positions, new Vector3(2, 1, 0),
-        //     texcoords, new Vector3(-1, 1, 1), new Vector3(-1, 1, -1),
-        //     2, 2, 1
-        // );
-        // generateFace(   //Z face
-        //     positions, new Vector3(0, 0, -1),
-        //     texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
-        //     2, 2, 2
-        // );
-        // generateFace(   //X face
-        //     positions, new Vector3(1, 0, 0),
-        //     texcoords, new Vector3(0, 1, 0), new Vector3(0, 0, 1),
-        //     2, 2, 1
-        // );
-        // generateFace(   //X face
-        //     positions, new Vector3(3, 0, 0),
-        //     texcoords, new Vector3(0, 1, 0), new Vector3(0, 0, 2),
-        //     2, 2, 1
-        // );
-        // generateFace(   //smth
-        //     positions, new Vector3(-3, 0, 0),
-        //     texcoords, new Vector3(1, 0, 2), new Vector3(0, 1, 2),
-        //     2, 2, 1
-        // );
+        generateFace(   // Y face
+            positions, new Vector3(2, 0, 0),
+            texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, -1),
+            2, 20
+        );
+
+        generateFace(
+            positions, new Vector3(-2, 0, 0),
+            texcoords, new Vector3(1, 1, 1), new Vector3(1, 1, -1),
+            2, 4
+        );
+
+
+        //bounding box
+        generateFace(   // X face right inside
+            positions, new Vector3(15, 0, 0),
+            texcoords, new Vector3(0, 0, 1), new Vector3(0, 1, 0),
+            40, 40
+        );
+        generateFace(   // X face left inside
+            positions, new Vector3(-15, 0, 0),
+            texcoords, new Vector3(0, 0, -1), new Vector3(0, 1, 0),
+            40, 40
+        );
+        generateFace(   // Y face top inside
+            positions, new Vector3(0, 15, 0),
+            texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, 1),
+            40, 40
+        );
+        generateFace(   // Y face bottom inside
+            positions, new Vector3(0, -15, 0),
+            texcoords, new Vector3(-1, 0, 0), new Vector3(0, 0, 1),
+            40, 40
+        );
+        generateFace(   // Z face close inside
+        positions, new Vector3(0, 0, 15),
+        texcoords, new Vector3(1, 0, 0), new Vector3(0, -1, 0),
+        40, 40
+    );
+        generateFace(   // Z face far inside
+            positions, new Vector3(0, 0, -15),
+            texcoords, new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+            40, 40
+        );
     }
 
-    const program = createProgram(
+    program = createProgram(
         gl,
         createShader(gl, vertexShader, gl.VERTEX_SHADER),
         createShader(gl, fragmentShader, gl.FRAGMENT_SHADER)
     );
+    program3 = createProgram(
+        gl,
+        createShader(gl, vertexShader, gl.VERTEX_SHADER),
+        createShader(gl, fragmentShaderDepth, gl.FRAGMENT_SHADER)
+    );
+    // program2 = createProgram(
+    //     gl,
+    //     createShader(gl, vertexShader, gl.VERTEX_SHADER),
+    //     createShader(gl, fragmentShaderLambertian, gl.FRAGMENT_SHADER)
+    // );
 
     mainVAO = gl.createVertexArray();
+    lambertianVAO = gl.createVertexArray();
+    depthVAO = gl.createVertexArray();
     gl.bindVertexArray(mainVAO);
 
     //init glInfo which stores info for creating textures
     glInfo.gl = gl;
 
+    // let position2AttributeLocation = gl.getAttribLocation(program2, "a_position");
     positionAttributeLocation = gl.getAttribLocation(program, "a_position");
     colorAttributeLocation = gl.getAttribLocation(program, "a_color");
     tangentsAttributeLocation = gl.getAttribLocation(program, "a_tangents");
     bitangentsAttributeLocation = gl.getAttribLocation(program, "a_bitangents");
     normalsAttributeLocation = gl.getAttribLocation(program, "a_normals");
     texcoordAttributeLocation = gl.getAttribLocation(program, "a_texcoord");
+    texcoordScaleAttributeLocation = gl.getAttribLocation(program, "a_texcoordScale");
     mouseUniformLocation = gl.getUniformLocation(program, "u_mouse");
     rotateUniformLocation = gl.getUniformLocation(program, "u_rotate");
     cameraRotationUniformLocation = gl.getUniformLocation(program, "u_cameraRotation");
@@ -239,6 +316,7 @@ async function init(canvas, gl) {
     colorTextureLocation = gl.getUniformLocation(program, "u_color_texture");
     normalDetailTextureLocation = gl.getUniformLocation(program, "u_normal_detail_texture");
     temporaryLocation_1 = gl.getUniformLocation(program, "u_temp_use_the_oclussion");
+
 
     for (let i2 = 0; i2 < positions.length / 9; i2++) { //i2 repeat for each triangle //divide by 3 coordinates, 3 vertices in triangle,
         let edge1 = new Vector3( positions[(i2*3 + 1)*3],  positions[(i2*3 + 1)*3 + 1],  positions[(i2*3 + 1)*3 + 2]);
@@ -266,38 +344,41 @@ async function init(canvas, gl) {
             normals[(i2*3 + i) * 3    ] = (edge1.y*edge2.z - edge1.z*edge2.y);
             normals[(i2*3 + i) * 3 + 1] = (edge1.z*edge2.x - edge1.x*edge2.z); //negative through sauron method - it's a cross product ??
             normals[(i2*3 + i) * 3 + 2] = (edge1.x*edge2.y - edge1.y*edge2.x);
+
+            console.log(edge1.length() / deltaUV1.length() + " ---- " + edge2.length() / deltaUV2.length());
+            textureScales[(i2*3 + i)*2] = edge1.length() / deltaUV1.length();
+            textureScales[(i2*3 + i)*2 + 1] = edge2.length() / deltaUV2.length();
         }
     }
 
     for (let i = 0; i < 6; i++){
-
-        // normals[3*18 + i*3]     = 0;       //Z face back
-        // normals[3*18 + 1 + i*3] = -1;
-        // normals[3*18 + 2 + i*3] = 0;
-        // tangents[3*18 + i*3]     = -1;
+        // tangents[3*18 + i*3]     = 0;
         // tangents[3*18 + 1 + i*3] = 0;
-        // tangents[3*18 + 2 + i*3] = 0;
+        // tangents[3*18 + 2 + i*3] = -1;
+        // bitangents[3*18 + i*3]     = -1;
+        // bitangents[3*18 + 1 + i*3] = 0;
+        // bitangents[3*18 + 2 + i*3] = 0;
         //
-        // normals[4*18 + i*3]     = 0;       //X face back (red - normal -1, 0, 0)
-        // normals[4*18 + 1 + i*3] = -1;
-        // normals[4*18 + 2 + i*3] = 0;
-        // tangents[4*18 + i*3]     = -1;
+        // tangents[4*18 + i*3]     = 0;
         // tangents[4*18 + 1 + i*3] = 0;
-        // tangents[4*18 + 2 + i*3] = 0;
+        // tangents[4*18 + 2 + i*3] = -1;
+        // bitangents[4*18 + i*3]     = -1;
+        // bitangents[4*18 + 1 + i*3] = 0;
+        // bitangents[4*18 + 2 + i*3] = 0;
         //
-        //  normals[5*18 + i*3]     = 0;       //Z face front
-        //  normals[5*18 + 1 + i*3] = -1;
-        //  normals[5*18 + 2 + i*3] = 0;
-        // tangents[5*18 + i*3]     = -1;
+        // tangents[5*18 + i*3]     = 0;
         // tangents[5*18 + 1 + i*3] = 0;
-        // tangents[5*18 + 2 + i*3] = 0;
+        // tangents[5*18 + 2 + i*3] = -1;
+        // bitangents[5*18 + i*3]     = -1;
+        // bitangents[5*18 + 1 + i*3] = 0;
+        // bitangents[5*18 + 2 + i*3] = 0;
         //
-        //  normals[6*18 + i*3]     = 0;       //X face front
-        //  normals[6*18 + 1 + i*3] = -1;
-        //  normals[6*18 + 2 + i*3] = 0;
-        // tangents[6*18 + i*3]     = -1;
+        // tangents[6*18 + i*3]     = 0;
         // tangents[6*18 + 1 + i*3] = 0;
-        // tangents[6*18 + 2 + i*3] = 0;
+        // tangents[6*18 + 2 + i*3] = -1;
+        // bitangents[6*18 + i*3]     = -1;
+        // bitangents[6*18 + 1 + i*3] = 0;
+        // bitangents[6*18 + 2 + i*3] = 0;
         //
         //
         //
@@ -311,80 +392,9 @@ async function init(canvas, gl) {
 
     for (let i = 0; i < normals.length / 6; i+= 3){ //3 coordinates; 6 vertices
         console.log("i: " + (1 + i / 3));
-        // console.log("p: (" + (positions[i*6]) + ", " + positions[i*6 + 1] + ", " + positions[i*6 + 2] + ")");
         console.log("t: (" + tangents[i*6] + ", " + tangents[i*6 + 1] + ", " + tangents[i*6 + 2] + ")");
         console.log("b: (" + bitangents[i*6] + ", " + bitangents[i*6 + 1] + ", " + bitangents[i*6 + 2] + ")");
         console.log("n: (" + normals[i*6] + ", " + normals[i*6 + 1] + ", " + normals[i*6 + 2] + ")");
-    }
-
-    for (let i = 0; i < 6; i++) {
-        /* switch (i){
-             case 0:
-                 normals[3 * 18 + i * 3] = -1;       //Z face back
-                 normals[3 * 18 + 1 + i * 3] = 1;
-                 normals[3 * 18 + 2 + i * 3] = 1;
-                 tangents[3 * 18 + i * 3] = 1;
-                 tangents[3 * 18 + 1 + i * 3] = 1;
-                 tangents[3 * 18 + 2 + i * 3] = -1;
-
-                 normals[2 * 18 + i * 3] = -1;       //Y face
-                 normals[2 * 18 + 1 + i * 3] = 1;
-                 normals[2 * 18 + 2 + i * 3] = 1;
-                 tangents[2 * 18 + i * 3] = 1;
-                 tangents[2 * 18 + 1 + i * 3] = 1;
-                 tangents[2 * 18 + 2 + i * 3] = -1;
-                 break;
-             case 3:
-                 normals[3 * 18 + i * 3] = -1;       //Z face back
-                 normals[3 * 18 + 1 + i * 3] = -1;
-                 normals[3 * 18 + 2 + i * 3] = 1;
-                 tangents[3 * 18 + i * 3] = -1;
-                 tangents[3 * 18 + 1 + i * 3] = 1;
-                 tangents[3 * 18 + 2 + i * 3] = 1;
-
-                 break;
-             case 4:
-                 normals[3 * 18 + i * 3] = -1;       //Z face back
-                 normals[3 * 18 + 1 + i * 3] = 1;
-                 normals[3 * 18 + 2 + i * 3] = 1;
-                 tangents[3 * 18 + i * 3] = 1;
-                 tangents[3 * 18 + 1 + i * 3] = 1;
-                 tangents[3 * 18 + 2 + i * 3] = -1;
-                 normals[2 * 18 + i * 3] = -1;       //Y face
-                 normals[2 * 18 + 1 + i * 3] = 1;
-                 normals[2 * 18 + 2 + i * 3] = 1;
-                 tangents[2 * 18 + i * 3] = 1;
-                 tangents[2 * 18 + 1 + i * 3] = 1;
-                 tangents[2 * 18 + 2 + i * 3] = -1;
-                 break;
-         }*/
-        // normals[3 * 18 + i * 3] = 0;       //Z face back
-        // normals[3 * 18 + 1 + i * 3] = 1;
-        // normals[3 * 18 + 2 + i * 3] = 0;
-        // tangents[3 * 18 + i * 3] = -1;
-        // tangents[3 * 18 + 1 + i * 3] = 0;
-        // tangents[3 * 18 + 2 + i * 3] = 0;
-
-        // normals[4 * 18 + i * 3] = 0;       //X face back
-        // normals[4 * 18 + 1 + i * 3] = 1;
-        // normals[4 * 18 + 2 + i * 3] = 0;
-        // tangents[4 * 18 + i * 3] = -1;
-        // tangents[4 * 18 + 1 + i * 3] = 0;
-        // tangents[4 * 18 + 2 + i * 3] = 0;
-        //
-        // normals[5 * 18 + i * 3] = 0;       //Z face front
-        // normals[5 * 18 + 1 + i * 3] = 1;
-        // normals[5 * 18 + 2 + i * 3] = 0;
-        // tangents[5 * 18 + i * 3] = -1;
-        // tangents[5 * 18 + 1 + i * 3] = 0;
-        // tangents[5 * 18 + 2 + i * 3] = 0;
-        //
-        // normals[6 * 18 + i * 3] = 0;       //X face front
-        // normals[6 * 18 + 1 + i * 3] = 1;
-        // normals[6 * 18 + 2 + i * 3] = 0;
-        // tangents[6 * 18 + i * 3] = -1;
-        // tangents[6 * 18 + 1 + i * 3] = 0;
-        // tangents[6 * 18 + 2 + i * 3] = 0;
     }
 
     let positionBuffer = gl.createBuffer();
@@ -398,6 +408,9 @@ async function init(canvas, gl) {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(texcoordAttributeLocation);
     gl.vertexAttribPointer(texcoordAttributeLocation, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+    let textureScaleBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureScaleBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureScales), gl.STATIC_DRAW);
     let tangentsBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, tangentsBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tangents), gl.STATIC_DRAW);
@@ -439,11 +452,11 @@ async function init(canvas, gl) {
     gl.enableVertexAttribArray(normalsAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, normalsBuffer);
     gl.vertexAttribPointer(normalsAttributeLocation, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+    gl.enableVertexAttribArray(texcoordScaleAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureScaleBuffer);
+    gl.vertexAttribPointer(texcoordScaleAttributeLocation, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
 
-    // addTexture(glInfo, "./normal.png", gl.TEXTURE2, normalTextureLocation, gl.RGBA, gl.RGBA);
-
-    // render_normals_from_height_map(glInfo, "./height_map.png", 100, gl.TEXTURE1, normalTextureLocation, gl.RGBA, gl.RGBA).then(
-    render_normals_from_height_map(glInfo, "./height_map.png", 12, gl.TEXTURE1, normalTextureLocation, gl.RGBA, gl.RGBA).then(
+    render_normals_from_height_map(glInfo, "./height_map.png", 24, gl.TEXTURE1, normalTextureLocation, gl.RGBA, gl.RGBA).then(
     // addTexture(glInfo, "./normal.png", gl.TEXTURE1, normalTextureLocation, gl.RGBA, gl.RGBA).then(
         () => {
             addTexture(glInfo, "./color.png", gl.TEXTURE2, colorTextureLocation, gl.RGBA, gl.RGBA).then(
@@ -458,12 +471,6 @@ async function init(canvas, gl) {
             }
         )}
     )
-    // addTexture(glInfo, "./normal.png", gl.TEXTURE2, normalTextureLocation);
-    // addTexture(glInfo, "./height_map.png", gl.TEXTURE2, heightMapTextureLocation, gl.RGBA, gl.RGBA);
-    // addTexture(glInfo, "./color.png", gl.TEXTURE1, heightMapTextureLocation, gl.RGBA, gl.RGBA);
-    // addTexture(glInfo, "./color.png", gl.TEXTURE1, colorTextureLocation, gl.RGBA, gl.RGBA);
-    // render_normals_from_height_map(glInfo, "./height_map.png", gl.TEXTURE1, normalTextureLocation, gl.RGBA, gl.RGBA);
-    // addTexture(glInfo, "./height_map.png", gl.TEXTURE4, colorTextureLocation, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT);
 }
 
 function loop(canvas, gl){
@@ -471,18 +478,11 @@ function loop(canvas, gl){
     canvas.width = window.innerWidth / resolution;
     canvas.height = window.innerHeight / resolution;
     gl.viewport(0, 0, canvas.width, canvas.height);
+
+    gl.useProgram(program);
+    gl.bindVertexArray(mainVAO);
     gl.uniform2f(displayProportionUniformLocation, canvas.width, canvas.height);
 
-    // cameraVector = [ //direction
-    //     Math.sin(rotateX) * -Math.cos(rotateY),
-    //     Math.sin(rotateY),
-    //     Math.cos(rotateX) * Math.cos(rotateY),
-    // ];
-    // cameraVector = [    //rotations values
-    //     rotateX,
-    //     rotateY,
-    //     0,
-    // ];
     gl.uniform2f(mouseUniformLocation, mouseX, mouseY);
     gl.uniform2f(rotateUniformLocation, rotateX, rotateY);      //rotation values
     // gl.uniform3fv(cameraRotationUniformLocation, cameraVector); //direction!?
@@ -492,9 +492,11 @@ function loop(canvas, gl){
     // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // this.framebuffer = gl.createFramebuffer();
-    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.depth, 0);
+
+
+
     gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3); //type, offset, count (position.length/size)
+    // gl.bindVertexArray(lambertianVAO);
 
     requestAnimationFrame(() => { loop(canvas, gl) });
 }
@@ -504,7 +506,7 @@ function defineGlAttribute(name, value) {
 }
 
 function changeTexture(gl, textureLocation, id) {
-gl.uniform1i(textureLocation, gl.TEXTURE0 - id - 1);
+    gl.uniform1i(textureLocation, gl.TEXTURE0 - id - 1);
 }
 
 var resolution = 1;	//rozdzielczoœæ canvas na którym jest wyœwietlany obraz
@@ -540,7 +542,7 @@ if (mouseState[0] == 1) {
     mouseX = (e.clientX / canvas.width * 2 / 3 - 1) / resolution * 5;
     mouseY = (-e.clientY / canvas.height * 2 / 3 + 1) / resolution * 5;
     rotateX = (clickX - mouseX + oldRotateX);
-    rotateY = (clickY - mouseY + oldRotateY);
+    rotateY = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, (clickY - mouseY + oldRotateY)))
 }
 });
 window.addEventListener("mouseup", function (e) {

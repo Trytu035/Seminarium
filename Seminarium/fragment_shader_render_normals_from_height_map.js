@@ -60,8 +60,9 @@ void main(){
 
     output_FragNormal = vec4(
     // (bump.xyz - n.xyz) / 2.0 + 0.5
-    // n.xyz / 2.0 + 0.5   //softer edges
-    bump.xyz / 2.0 + 0.5
+    n.xyz / 2.0 + 0.5   //softer edges
+    // bump.xyz / 2.0 + 0.5
+    // vec3(300.*dFdx(height), 300.*dFdy(height), 1.0) / 2.0 + 0.5
     , 1.0);
     
     // output_FragNormal = normalize(texture(u_height_map_texture, v_texcoord).rgb);

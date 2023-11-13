@@ -39,11 +39,15 @@ async function addTexture(glInfo, source, id, textureLocation, internalFormat, f
     await image.addEventListener('load', function () {
         // Now that the image has loaded make copy it to the texture.
         glInfo.gl.bindTexture(glInfo.gl.TEXTURE_2D, texture);
-        glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR);
+        // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.NEAREST_MIPMAP_NEAREST);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.NEAREST_MIPMAP_LINEAR);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
-        // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_LINEAR);
+        glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
+        glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MAG_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
+        // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MAG_FILTER, glInfo.gl.LINEAR_MIPMAP_LINEAR);
+        // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_WRAP_S, glInfo.gl.CLAMP_TO_EDGE);
+        // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_WRAP_T, glInfo.gl.REPEAT);
         glInfo.gl.texImage2D(glInfo.gl.TEXTURE_2D, 0, internalFormat, format, glInfo.gl.UNSIGNED_BYTE, image);
         glInfo.imagesArray.push(image);
         glInfo.gl.generateMipmap(glInfo.gl.TEXTURE_2D);

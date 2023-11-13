@@ -8,9 +8,12 @@ class Vector2 {
         this.x /= length;
         this.y /= length;
     }
-    add(other){
+    add(other) {
         this.x += other.x;
         this.y += other.y;
+    }
+    length() {
+        return Math.sqrt(this.x*this.x + this.y*this.y)
     }
 }
 
@@ -36,9 +39,12 @@ class Vector3 {
             this.x * oter.y - this.y * other.x,
         )
     }
-    add(other){
+    add(other) {
         this.x += other.x;
         this.y += other.y;
         this.z += other.z;
+    }
+    length() {
+        return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z)
     }
 }
