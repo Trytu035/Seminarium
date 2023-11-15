@@ -9,11 +9,15 @@ function main() {
         () => {
             console.log("done");
             init(canvas, gl).then(
-                () => {
+                (error) => {
                     loop(canvas, gl);
                 }
-            )
+            ).catch(
+                (error) => { console.error(error); }
+            );
         }
+    ).catch(
+        (error) => { console.error(error); }
     );
 
     // init_render_normals_from_height_map(normal_texture_canvas, normal_texture_gl);
@@ -41,23 +45,6 @@ let heightMapTextureLocation;
 let colorTextureLocation;
 let normalDetailTextureLocation;
 
-
-let _positionAttributeLocation;
-let _colorAttributeLocation;
-let _tangentsAttributeLocation;
-let _bitangentsAttributeLocation;
-let _normalsAttributeLocation;
-let _mouseUniformLocation;
-let _rotateUniformLocation;
-let _cameraRotationUniformLocation;
-let _displayProportionUniformLocation;
-let _distanceUniformLocation;
-let _texcoordAttributeLocation;
-let _normalTextureLocation;
-let _heightMapTextureLocation;
-let _colorTextureLocation;
-let _normalDetailTextureLocation;
-
 let mainVAO; // Vertex Attribute Object
 let lambertianVAO;
 let depthVAO;
@@ -79,6 +66,9 @@ class Model {
         this.mvp = [];
         this.VAO = material.gl.createVertexArray();
         this.attributeLocation;
+    }
+    init() {
+        gl.bindVertexArray(this.VAO);
     }
 }
 class Material {
@@ -201,7 +191,7 @@ async function init(canvas, gl) {
         generateFace(   // Y face (middle) bottom
             positions, new Vector3(0, 0, 0),
             texcoords, new Vector3(1, 0, 0), new Vector3(0, 0, 1),
-            4, 4, 1
+            2, 2, 1
         );
         generateFace(   //Z face back
             positions, new Vector3(0, 1, -1),
@@ -341,9 +331,9 @@ async function init(canvas, gl) {
             bitangents[(i2*3 + i) * 3 + 1] = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
             bitangents[(i2*3 + i) * 3 + 2] = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
             //normal(Z)
-            normals[(i2*3 + i) * 3    ] = (edge1.y*edge2.z - edge1.z*edge2.y);
-            normals[(i2*3 + i) * 3 + 1] = (edge1.z*edge2.x - edge1.x*edge2.z); //negative through sauron method - it's a cross product ??
-            normals[(i2*3 + i) * 3 + 2] = (edge1.x*edge2.y - edge1.y*edge2.x);
+            normals[(i2*3 + i) * 3    ] = f * (edge1.y*edge2.z - edge1.z*edge2.y);
+            normals[(i2*3 + i) * 3 + 1] = f * (edge1.z*edge2.x - edge1.x*edge2.z); //negative through sauron method - it's a cross product ??
+            normals[(i2*3 + i) * 3 + 2] = f * (edge1.x*edge2.y - edge1.y*edge2.x);
 
             console.log(edge1.length() / deltaUV1.length() + " ---- " + edge2.length() / deltaUV2.length());
             textureScales[(i2*3 + i)*2] = edge1.length() / deltaUV1.length();
@@ -352,33 +342,47 @@ async function init(canvas, gl) {
     }
 
     for (let i = 0; i < 6; i++){
-        // tangents[3*18 + i*3]     = 0;
-        // tangents[3*18 + 1 + i*3] = 0;
-        // tangents[3*18 + 2 + i*3] = -1;
-        // bitangents[3*18 + i*3]     = -1;
-        // bitangents[3*18 + 1 + i*3] = 0;
-        // bitangents[3*18 + 2 + i*3] = 0;
-        //
-        // tangents[4*18 + i*3]     = 0;
-        // tangents[4*18 + 1 + i*3] = 0;
-        // tangents[4*18 + 2 + i*3] = -1;
-        // bitangents[4*18 + i*3]     = -1;
-        // bitangents[4*18 + 1 + i*3] = 0;
-        // bitangents[4*18 + 2 + i*3] = 0;
-        //
-        // tangents[5*18 + i*3]     = 0;
-        // tangents[5*18 + 1 + i*3] = 0;
-        // tangents[5*18 + 2 + i*3] = -1;
-        // bitangents[5*18 + i*3]     = -1;
-        // bitangents[5*18 + 1 + i*3] = 0;
-        // bitangents[5*18 + 2 + i*3] = 0;
-        //
-        // tangents[6*18 + i*3]     = 0;
-        // tangents[6*18 + 1 + i*3] = 0;
-        // tangents[6*18 + 2 + i*3] = -1;
-        // bitangents[6*18 + i*3]     = -1;
-        // bitangents[6*18 + 1 + i*3] = 0;
-        // bitangents[6*18 + 2 + i*3] = 0;
+        /*
+        tangents[3*18 + i*3]     = -2;
+        tangents[3*18 + 1 + i*3] = 0;
+        tangents[3*18 + 2 + i*3] = 0;
+        bitangents[3*18 + i*3]     = 0;
+        bitangents[3*18 + 1 + i*3] = 0;
+        bitangents[3*18 + 2 + i*3] = -2;
+        normals[3*18 + i*3]     = 0;
+        normals[3*18 + 1 + i*3] = -4;
+        normals[3*18 + 2 + i*3] = 0;
+
+        tangents[4*18 + i*3]     = 2;
+        tangents[4*18 + 1 + i*3] = 0;
+        tangents[4*18 + 2 + i*3] = 0;
+        bitangents[4*18 + i*3]     = 0;
+        bitangents[4*18 + 1 + i*3] = 0;
+        bitangents[4*18 + 2 + i*3] = 2;
+        normals[4*18 + i*3]     = 0;
+        normals[4*18 + 1 + i*3] = -4;
+        normals[4*18 + 2 + i*3] = 0;
+
+        tangents[5*18 + i*3]     = 2;
+        tangents[5*18 + 1 + i*3] = 0;
+        tangents[5*18 + 2 + i*3] = 0;
+        bitangents[5*18 + i*3]     = 0;
+        bitangents[5*18 + 1 + i*3] = 0;
+        bitangents[5*18 + 2 + i*3] = 2;
+        normals[5*18 + i*3]     = 0;
+        normals[5*18 + 1 + i*3] = -4;
+        normals[5*18 + 2 + i*3] = 0;
+
+        tangents[6*18 + i*3]     = 2;
+        tangents[6*18 + 1 + i*3] = 0;
+        tangents[6*18 + 2 + i*3] = 0;
+        bitangents[6*18 + i*3]     = 0;
+        bitangents[6*18 + 1 + i*3] = 0;
+        bitangents[6*18 + 2 + i*3] = 2;
+        normals[6*18 + i*3]     = 0;
+        normals[6*18 + 1 + i*3] = -4;
+        normals[6*18 + 2 + i*3] = 0;
+         */
         //
         //
         //

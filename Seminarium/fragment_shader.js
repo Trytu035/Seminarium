@@ -29,6 +29,11 @@ in mat4 v_view_matrix;
 in mat4 v_projection_matrix;
 in mat4 v_world_view_projection;
 in mat4 v_world_inverse_transpose;
+struct depth_range_t {
+    float near;
+    float far;
+};
+in depth_range_t v_projected_depth_range;
 
 out vec4 output_FragColor;
 
@@ -37,6 +42,11 @@ mat4 rotate_z(float angle);
 // vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir);
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D depthMap);
 	
+//https://www.omnicalculator.com/math/vector-projection
+vec3 project(vec3 a, vec3 overB) {   //projects vector a, over vector b, resulting in vector b of length  of vector a projected on b
+	return dot(a, overB) / dot(overB, overB) * overB;
+}
+
 void main(){
     //apparent height under the cursor 
     float height;
@@ -125,17 +135,15 @@ void main(){
 	
 	// if (v_temp_use_the_oclussion > 0.5) {
 	//     output_FragColor = vec4(normalize(v_TBN[2]) /2. + 0.5, 1);
-	    // output_FragColor = vec4(normalize(v_TBN * normals) /2. + 0.5, 1);
 	// }else {
 	//     output_FragColor = vec4(normalize(normals.rgb) / 2. + 0.5, 1);
-	    // output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb, 1);
 	// }
 	
 	// output_FragColor = vec4(normalize(normals * v_TBN) /2. + 0.5, 1);
-	// output_FragColor = vec4((normals) /2. + 0.5, 1);
+	output_FragColor = vec4((normals) /2. + 0.5, 1);
 	// output_FragColor = vec4(((normals * v_TBN) /2. + 0.5)*normalToCamera, 1);
 	// output_FragColor = vec4(vec3((theta + phi)/5.), 1);
-	output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
+	// output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
 	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb*normalToCamera, 1);
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*normalToCamera, 1);
 	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
@@ -148,11 +156,29 @@ void main(){
 	// output_FragColor = vec4(vec3(view_direction.z) / 2. + 0.5, 1);
 	//zbuffer
 	// gl_FragCoord.z = frag_position.z;
-	gl_FragDepth = vec4(vec3(length((vec3(v_camera_matrix[3]) - frag_position))) / 50., 1).r;
 	// output_FragColor = vec4(vec3(length((vec3(v_camera_matrix[3]) - frag_position))) / 10., 1);
 	// output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 500.0)), 1.);
+	// output_FragColor = vec4(
+	//     vec3(pow(
+	//         (
+	//             1./length(project(v_camera_matrix[3].xyz - frag_position, v_camera_matrix[2].xyz))  //z plane distance
+    //             - 1./v_projected_depth_range.near
+    //         ) / (1./v_projected_depth_range.far - 1./v_projected_depth_range.near)
+    //     , 500.0)) // - vec3(pow(gl_FragCoord.z, 500.0))
+    // , 1.);
 	// output_FragColor = vec4(vec3(length((vec3(v_camera_matrix[3]) - frag_position))) / 5., 1);
 	// output_FragColor = vec4(gl_FragCoord.xy /400., 0., 1);
+	// output_FragColor = vec4(vec3(v_projected_depth_range.near), 1.0);
+	// gl_FragDepth = (length(  //linear
+    //     vec3(v_camera_matrix[3]) - frag_position
+    // ) - v_projected_depth_range.near) / (v_projected_depth_range.far - v_projected_depth_range.near);
+	// gl_FragDepth = (1./length(   //non linear
+    //     vec3(v_camera_matrix[3]) - frag_position
+    // ) - 1./v_projected_depth_range.near) / (1./v_projected_depth_range.far - 1./v_projected_depth_range.near);
+	gl_FragDepth = (    //non linear, projected to camera z-plane
+        1./length(project(v_camera_matrix[3].xyz - frag_position, v_camera_matrix[2].xyz))  //z plane distance
+        - 1./v_projected_depth_range.near
+    ) / (1./v_projected_depth_range.far - 1./v_projected_depth_range.near);
 }
 
 	mat4 rotate_y(float angle) {
@@ -179,8 +205,8 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D
     // number of depth layers
     const float minLayers = 8.0;
     const float maxLayers = 32.0;
-    const float numLayers = 20.;
-    // float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
+    // const float numLayers = 20.;
+    float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
     
     float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
@@ -189,18 +215,19 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D
     vec2 P = viewDir.xy / viewDir.z * height_scale; 
     vec2 deltaTexCoords = P / numLayers;
     vec2  currentTexCoords     = texCoords;
-    float currentDepthMapValue = texture(depthMap, currentTexCoords).r;
+    float currentDepthMapValue = 1.0 - texture(depthMap, currentTexCoords).r;
       
     // trzeba podzielić przez skalę textury
     //poniższa linia do zmiany
-    vec3 world_view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) / (viewDir.z / mix(v_texcoordScale.x, v_texcoordScale.y, 0.5));   //added line 
+    // nie trzeba dzielić przez skalę tekstury, jeżeli wektory TBN są znormalizowane pod względem skali UV mapy
+    vec3 world_view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) / (viewDir.z /*/ mix(v_texcoordScale.x, v_texcoordScale.y, 0.5)*/);   //added line 
     while(currentLayerDepth < currentDepthMapValue)
     {
         // shift texture coordinates along direction of P
         currentTexCoords -= deltaTexCoords;
         frag_position -= world_view_direction * height_scale / numLayers;   //added line
         // get depthmap value at current texture coordinates
-        currentDepthMapValue = texture(depthMap, currentTexCoords).r;  
+        currentDepthMapValue = 1.0 - texture(depthMap, currentTexCoords).r;  
         // get depth of next layer
         currentLayerDepth += layerDepth ;  
     }
@@ -211,7 +238,7 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D
     
     // get depth after and before collision for linear interpolation
     float afterDepth  = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
+    float beforeDepth = 1.0 - texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
      
     // interpolation of texture coordinates
     float weight = afterDepth / (afterDepth - beforeDepth);

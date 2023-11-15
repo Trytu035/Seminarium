@@ -44,7 +44,7 @@ async function addTexture(glInfo, source, id, textureLocation, internalFormat, f
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.NEAREST_MIPMAP_LINEAR);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
         glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
-        glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MAG_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
+        glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MAG_FILTER, glInfo.gl.LINEAR);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MAG_FILTER, glInfo.gl.LINEAR_MIPMAP_LINEAR);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_WRAP_S, glInfo.gl.CLAMP_TO_EDGE);
         // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_WRAP_T, glInfo.gl.REPEAT);
