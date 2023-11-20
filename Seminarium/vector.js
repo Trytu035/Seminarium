@@ -48,3 +48,69 @@ class Vector3 {
         return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z)
     }
 }
+
+// math.matrix
+//for matrices 4x4
+//
+function translate_mtx(x, y, z) {
+    return math.matrixFromColumns(
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [x, y, z, 1]
+    );
+}
+
+function scale_mtx(x, y, z) {
+    return math.matrixFromColumns(
+        [x, 0, 0, 0],
+        [0, y, 0, 0],
+        [0, 0, z, 0],
+        [0, 0, 0, 1]
+    );
+}
+
+function rotate_x_mtx(angle) {
+    return math.matrixFromColumns(
+        [1.0,   0.0,                0.0,                0.0],
+        [0.0,   Math.cos(angle),    Math.sin(angle),    0.0],
+        [0.0,   -Math.sin(angle),   Math.cos(angle),    0.0],
+        [0.0,   0.0,                0.0,                1.0]
+    );
+}
+
+function rotate_y_mtx(angle) {
+    return math.matrixFromColumns(
+        [Math.cos(angle),   0.0,    -Math.sin(angle),   0.0],
+        [0.0,	            1.0,    0.0,	            0.0],
+        [Math.sin(angle),   0.0,    Math.cos(angle),    0.0],
+        [0.0,	            0.0,    0.0,	            1.0]
+    );
+}
+function rotate_z_mtx(angle) {
+    return math.matrixFromColumns(
+        [Math.cos(angle),   Math.sin(angle),	0.0,	0.0],
+        [-Math.sin(angle),  Math.cos(angle),	0.0,	0.0],
+        [0.0,		        0.0,	            1.0,	0.0],
+        [0.0,		        0.0,	            0.0,	1.0]
+    );
+}
+
+function normalize_vec(array) {
+    return math.multiply(array,
+        math.sqrt(
+            math.dot(array, array)
+        )
+    );
+}
+
+function perspective_mtx(fieldOfViewInRadians, near, far, aspect_ratio) {
+    let fovFactor = Math.tan(degToRad(90.0) - 0.5 * fieldOfViewInRadians);
+    let range_invariant = 1.0 / (near - far);
+    return math.matrixFromColumns(
+        [fovFactor / aspect_ratio,	0,			0,									0],
+        [0,							fovFactor,	0,									0],
+        [0,							0,			(near + far) * range_invariant,	    -1],
+        [0,							0,			near * far * range_invariant * 2.,	0]
+    );
+}

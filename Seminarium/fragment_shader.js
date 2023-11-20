@@ -1,15 +1,12 @@
 var fragmentShader =`#version 300 es
-precision highp float;
-// precision lowp float;
+// precision highp float;
+precision lowp float;
 // precision highp int;
 // precision lowp sampler2D;
 // precision lowp samplerCube;
 in vec4 v_position;
-// in mat4 v_model_matrix;
-in vec3 v_fNormals;
 in float v_normalToCamera;
 in vec2 v_texcoord;
-in vec2 v_texcoordScale;
 in mat3 v_TBN;
 in vec4 v_fColor;
 uniform sampler2D u_normal_texture;
@@ -39,7 +36,6 @@ out vec4 output_FragColor;
 
 mat4 rotate_y(float angle);
 mat4 rotate_z(float angle);
-// vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir);
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D depthMap);
 	
 //https://www.omnicalculator.com/math/vector-projection
@@ -58,17 +54,15 @@ void main(){
     const float step_height = max_parallax / float(number_of_iterations);
     vec2 texcoord = v_texcoord;
 
-    // vec3 view_position = vec3(0., 0., 0.);
-    vec3 view_position = v_view_matrix[3].xyz;
+    vec3 view_position = v_camera_matrix[3].xyz;
     frag_position = vec3(v_position);
-    // vec3 view_direction = normalize(vec3(v_camera_matrix[3].xyz)) * v_TBN;
-    vec3 view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) * v_TBN;  //tangent view_direction
-    vec3 world_view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position);
+    vec3 view_direction = normalize(view_position - frag_position) * v_TBN;  //tangent view_direction
+    vec3 world_view_direction = normalize(view_position - frag_position);
     vec2 delta_uv = view_direction.xy * step_height / -view_direction.z;
     //https://apoorvaj.io/exploring-bump-mapping-with-webgl/
     // vec2 delta_uv = vec2(0., 0.);
     
-    texcoord = ParallaxMapping(texcoord, view_direction, 0.5, u_height_map_texture);
+    texcoord = ParallaxMapping(texcoord, view_direction, 1.0, u_height_map_texture);
     
     /*float accumulator = 0.;
     float point_of_crossing;
@@ -117,16 +111,16 @@ void main(){
 	normals = normalize(vec3(rotate_z(phi) * rotate_y(theta) * rotate_z(-phi) * vec4(normals, 0.0)));
 	// normals = vec3(normals.x, normals.y, clamp(normals.z, 0., 1.));  //clamp z
 	
+	//to reverse all normals, referse [0] and [1]
 	normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * normals );
+	// normals = normalize(mat3(-v_TBN[0], v_TBN[1], v_TBN[2]) * normals );
     
     // phi, theta for visuals
-    phi = atan((normals * v_TBN).y, (normals * v_TBN).x);
-    theta = atan(length((normals * v_TBN).xy), (normals * v_TBN).z);
+    // phi = atan((normals * v_TBN).y, (normals * v_TBN).x);
+    // theta = atan(length((normals * v_TBN).xy), (normals * v_TBN).z);
     
     float normalToCamera = dot(normals, normalize(v_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normals, normalize(vec3(0., 0., 1.) * mat3(v_projection_matrix * v_view_matrix)));
 
-	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
 	// output_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
 
 	// output_FragColor = vec4(vec3(height)*normalToCamera, 1);
@@ -139,19 +133,21 @@ void main(){
 	//     output_FragColor = vec4(normalize(normals.rgb) / 2. + 0.5, 1);
 	// }
 	
+	// output_FragColor = vec4((v_camera_matrix[2].xyz) /2. + 0.5, 1);
+	
 	// output_FragColor = vec4(normalize(normals * v_TBN) /2. + 0.5, 1);
-	output_FragColor = vec4((normals) /2. + 0.5, 1);
+	// output_FragColor = vec4((normals) /2. + 0.5, 1);
 	// output_FragColor = vec4(((normals * v_TBN) /2. + 0.5)*normalToCamera, 1);
 	// output_FragColor = vec4(vec3((theta + phi)/5.), 1);
-	// output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
-	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb*normalToCamera, 1);
+	output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
+	// output_FragColor = vec4(texture(u_height_map_texture, v_texcoord).rgb, 1);
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*normalToCamera, 1);
 	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*(0.5 + normalToCamera/2.0), 1);
 	// output_FragColor = texture(u_normal_texture, texcoord);
 
-	view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) * v_TBN;
-	// view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position);
+	// view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) * v_TBN;
+	view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position);
 	// view_direction = normalize(normalize(vec3(1., 1., 1. - theta) * normalize(vec3(v_camera_matrix[3]) - frag_position) ) * v_TBN);
 	// output_FragColor = vec4(vec3(view_direction.z) / 2. + 0.5, 1);
 	//zbuffer
@@ -205,8 +201,9 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D
     // number of depth layers
     const float minLayers = 8.0;
     const float maxLayers = 32.0;
-    // const float numLayers = 20.;
-    float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
+    const float numLayers = 40.0;
+    // float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));    //doesn't work - will lag your computer
+    
     
     float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
@@ -215,19 +212,20 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D
     vec2 P = viewDir.xy / viewDir.z * height_scale; 
     vec2 deltaTexCoords = P / numLayers;
     vec2  currentTexCoords     = texCoords;
-    float currentDepthMapValue = 1.0 - texture(depthMap, currentTexCoords).r;
+    float currentDepthMapValue = texture(depthMap, currentTexCoords).r;
       
     // trzeba podzielić przez skalę textury
     //poniższa linia do zmiany
     // nie trzeba dzielić przez skalę tekstury, jeżeli wektory TBN są znormalizowane pod względem skali UV mapy
-    vec3 world_view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) / (viewDir.z /*/ mix(v_texcoordScale.x, v_texcoordScale.y, 0.5)*/);   //added line 
+    //trzeba podzielić przez skalę głębokości?
+    vec3 world_view_direction = normalize(vec3(v_camera_matrix[3]) - frag_position) / viewDir.z;   //added line 
     while(currentLayerDepth < currentDepthMapValue)
     {
         // shift texture coordinates along direction of P
         currentTexCoords -= deltaTexCoords;
         frag_position -= world_view_direction * height_scale / numLayers;   //added line
         // get depthmap value at current texture coordinates
-        currentDepthMapValue = 1.0 - texture(depthMap, currentTexCoords).r;  
+        currentDepthMapValue = texture(depthMap, currentTexCoords).r;  
         // get depth of next layer
         currentLayerDepth += layerDepth ;  
     }
@@ -238,7 +236,7 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float height_scale, sampler2D
     
     // get depth after and before collision for linear interpolation
     float afterDepth  = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = 1.0 - texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
+    float beforeDepth = texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
      
     // interpolation of texture coordinates
     float weight = afterDepth / (afterDepth - beforeDepth);

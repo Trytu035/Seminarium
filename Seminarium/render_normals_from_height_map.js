@@ -1,8 +1,8 @@
 var normalsVAO;
 let normalsGlInfo = {
-    gl: undefined,
-    imagesArray: [],
-    texturesArray: [],
+    material: {gl: undefined},
+    images: [],
+    textures: [],
     canvas: undefined,
     textureLocation: undefined,
     slopeStrengthLocation: undefined,
@@ -19,7 +19,7 @@ async function init_render_normals_from_height_map() {
         createShader(gl, vertexShaderRenderNormalsFromHeightMap, gl.VERTEX_SHADER),
         createShader(gl, fragmentShaderRenderNormalsFromHeightMap, gl.FRAGMENT_SHADER)
     );
-    normalsGlInfo.gl = gl;
+    normalsGlInfo.material.gl = gl;
     normalsGlInfo.canvas = canvas;
     let positionAttributeLocation = gl.getAttribLocation(create_normals_program, "a_position");
     let texcoordLocation = gl.getAttribLocation(create_normals_program, "a_texcoord");
@@ -55,45 +55,48 @@ async function init_render_normals_from_height_map() {
     gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
 }
 
-async function render_normals_from_height_map(glInfo, height_map, slope_strength, id, textureLocation) {
-    let texture = glInfo.gl.createTexture();
+async function render_normals_from_height_map(model, height_map, slope_strength, id, textureLocation) {
+    let gl = model.material.gl;
+    let texture = gl.createTexture();
 
-    glInfo.gl.bindTexture(glInfo.gl.TEXTURE_2D, texture);
+    gl.bindVertexArray(model.VAO);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     // Fill the texture with a 1x1 blue pixel.
-    glInfo.gl.texImage2D(glInfo.gl.TEXTURE_2D, 0, glInfo.gl.RGBA, 1, 1, 0, glInfo.gl.RGBA, glInfo.gl.UNSIGNED_BYTE,
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
         new Uint8Array([0, 0, 255, 255]));
-    await addTexture(normalsGlInfo, height_map, normalsGlInfo.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.gl.RGBA, normalsGlInfo.gl.RGBA,
+    await addTexture(normalsGlInfo, height_map, normalsGlInfo.material.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.material.gl.RGBA, normalsGlInfo.material.gl.RGBA,
         () => {
-            normalsGlInfo.gl.clear(normalsGlInfo.gl.COLOR_BUFFER_BIT | normalsGlInfo.gl.DEPTH_BUFFER_BIT);
-            normalsGlInfo.gl.uniform1f(normalsGlInfo.slopeStrengthLocation, slope_strength);
-            normalsGlInfo.gl.drawArrays(normalsGlInfo.gl.TRIANGLES, 0, 6);
+            normalsGlInfo.material.gl.clear(normalsGlInfo.material.gl.COLOR_BUFFER_BIT | normalsGlInfo.material.gl.DEPTH_BUFFER_BIT);
+            normalsGlInfo.material.gl.uniform1f(normalsGlInfo.slopeStrengthLocation, slope_strength);
+            normalsGlInfo.material.gl.drawArrays(normalsGlInfo.material.gl.TRIANGLES, 0, 6);
             console.log("texture_drawn");
             console.log("image_loaded");
             // Now that the image has loaded make copy it to the texture.
-            glInfo.gl.bindTexture(glInfo.gl.TEXTURE_2D, texture);
-            // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR);
-            // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.NEAREST_MIPMAP_NEAREST);
-            // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.NEAREST_MIPMAP_LINEAR);
-            // glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_NEAREST);
-            glInfo.gl.texParameteri(glInfo.gl.TEXTURE_2D, glInfo.gl.TEXTURE_MIN_FILTER, glInfo.gl.LINEAR_MIPMAP_LINEAR);
-            glInfo.gl.texImage2D(glInfo.gl.TEXTURE_2D, 0, glInfo.gl.RGBA, glInfo.gl.RGBA, glInfo.gl.UNSIGNED_BYTE, normalsGlInfo.canvas);
-            glInfo.gl.generateMipmap(glInfo.gl.TEXTURE_2D);
-            glInfo.gl.bindTexture(glInfo.gl.TEXTURE_2D, null);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, normalsGlInfo.canvas);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.bindTexture(gl.TEXTURE_2D, null);
             // normalsGlInfo.gl.clear(normalsGlInfo.gl.COLOR_BUFFER_BIT | normalsGlInfo.gl.DEPTH_BUFFER_BIT);
         }
     );
     console.log("texture_added");
     console.log("texture_pushed");
-    glInfo.texturesArray.push(texture);
-    glInfo.gl.activeTexture(id);
-    glInfo.gl.bindTexture(glInfo.gl.TEXTURE_2D, texture);
+    model.textures.push(texture);
+    gl.activeTexture(id);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     if (textureLocation == null) {
-        console.log("texturelocation " + (id - glInfo.gl.TEXTURE1) + " is null");
+        console.log("texturelocation " + (id - gl.TEXTURE1) + " is null");
         console.trace();
     } else {
-        console.log("location " + (id - glInfo.gl.TEXTURE1));
-        // id from glInfo.gl.TEXTURE1 should have textureLocation 0
-        glInfo.gl.uniform1i(textureLocation, id - glInfo.gl.TEXTURE1);
+        console.log("location " + (id - gl.TEXTURE1));
+        // id from gl.TEXTURE1 should have textureLocation 0
+        gl.uniform1i(textureLocation, id - gl.TEXTURE1);
     }
-    glInfo.gl.bindTexture(glInfo.gl.TEXTURE_2D, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindVertexArray(null);
 }
