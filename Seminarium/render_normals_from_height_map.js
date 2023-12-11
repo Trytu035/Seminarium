@@ -55,48 +55,28 @@ async function init_render_normals_from_height_map() {
     gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
 }
 
-async function render_normals_from_height_map(model, height_map, slope_strength, id, textureLocation) {
-    let gl = model.material.gl;
-    let texture = gl.createTexture();
-
-    gl.bindVertexArray(model.VAO);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    // Fill the texture with a 1x1 blue pixel.
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-        new Uint8Array([0, 0, 255, 255]));
-    await addTexture(normalsGlInfo, height_map, normalsGlInfo.material.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.material.gl.RGBA, normalsGlInfo.material.gl.RGBA,
-        () => {
-            normalsGlInfo.material.gl.clear(normalsGlInfo.material.gl.COLOR_BUFFER_BIT | normalsGlInfo.material.gl.DEPTH_BUFFER_BIT);
-            normalsGlInfo.material.gl.uniform1f(normalsGlInfo.slopeStrengthLocation, slope_strength);
-            normalsGlInfo.material.gl.drawArrays(normalsGlInfo.material.gl.TRIANGLES, 0, 6);
-            console.log("texture_drawn");
-            console.log("image_loaded");
-            // Now that the image has loaded make copy it to the texture.
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
-            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
-            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, normalsGlInfo.canvas);
-            gl.generateMipmap(gl.TEXTURE_2D);
-            gl.bindTexture(gl.TEXTURE_2D, null);
-            // normalsGlInfo.gl.clear(normalsGlInfo.gl.COLOR_BUFFER_BIT | normalsGlInfo.gl.DEPTH_BUFFER_BIT);
-        }
-    );
-    console.log("texture_added");
-    console.log("texture_pushed");
-    model.textures.push(texture);
-    gl.activeTexture(id);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    if (textureLocation == null) {
-        console.log("texturelocation " + (id - gl.TEXTURE1) + " is null");
-        console.trace();
+async function add_normals_from_height_map_image(source, slope_strength, callback) {
+    let image = new Image();  //height_map to calculate normals from.
+    if (typeof source === typeof new Image()) {
+        image = source;
     } else {
-        console.log("location " + (id - gl.TEXTURE1));
-        // id from gl.TEXTURE1 should have textureLocation 0
-        gl.uniform1i(textureLocation, id - gl.TEXTURE1);
+        console.error("expected image source instead of given url source" + source);
+        return null;
     }
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.bindVertexArray(null);
+    // offscreenGl = offscreenCanvas.getContext("webgl2");
+    // if (offscreenGl == null) {
+    //     console.error("offscreenCanvas context is not set to webgl2, change context to webgl2, or change offscreen check to match current behaviour.")
+    // }
+    addTexture(normalsGlInfo, image, normalsGlInfo.material.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.material.gl.RGBA, normalsGlInfo.material.gl.RGBA);
+
+    normalsGlInfo.textures.forEach((textureInfo) => {
+        setTexture(normalsGlInfo, textureInfo.texture, textureInfo.location, textureInfo.id);
+    });
+    normalsGlInfo.material.gl.clear(normalsGlInfo.material.gl.COLOR_BUFFER_BIT | normalsGlInfo.material.gl.DEPTH_BUFFER_BIT);
+    normalsGlInfo.material.gl.uniform1f(normalsGlInfo.slopeStrengthLocation, slope_strength);
+    normalsGlInfo.material.gl.drawArrays(normalsGlInfo.material.gl.TRIANGLES, 0, 6);
+    // offscreenGl.clear(offscreenGl.COLOR_BUFFER_BIT | offscreenGl.DEPTH_BUFFER_BIT);
+    // offscreenGl.uniform1f(slope_strength_location, slope_strength);
+    // offscreenGl.drawArrays(offscreenGl.TRIANGLES, 0, 6);
+    callback(normalsGlInfo.canvas);
 }

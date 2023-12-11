@@ -15,6 +15,9 @@ class Vector2 {
     length() {
         return Math.sqrt(this.x*this.x + this.y*this.y)
     }
+    toArray(){
+        return [this.x, this.y];
+    }
 }
 
 class Vector3 {
@@ -28,6 +31,7 @@ class Vector3 {
         this.x /= length;
         this.y /= length;
         this.z /= length;
+        return this;
     }
     toArray() {
         return [this.x, this.y, this.z];
@@ -97,7 +101,7 @@ function rotate_z_mtx(angle) {
 }
 
 function normalize_vec(array) {
-    return math.multiply(array,
+    return math.divide(array,
         math.sqrt(
             math.dot(array, array)
         )
@@ -105,12 +109,31 @@ function normalize_vec(array) {
 }
 
 function perspective_mtx(fieldOfViewInRadians, near, far, aspect_ratio) {
-    let fovFactor = Math.tan(degToRad(90.0) - 0.5 * fieldOfViewInRadians);
+    // let fovFactor = Math.tan(degToRad(90.0) - 0.5 * fieldOfViewInRadians);
+    // let range_invariant = 1.0 / (near - far);
+    // return math.matrixFromColumns(
+    //     [fovFactor / aspect_ratio,	0,			0,									0],
+    //     [0,							fovFactor,	0,									0],
+    //     [0,							0,			(near + far) * range_invariant,	    -1],
+    //     [0,							0,			near * far * range_invariant * 2.,	0]
+    // );
+
+    //https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec4.pdf
+    let fovFactor = Math.tan(0.5 * fieldOfViewInRadians);
     let range_invariant = 1.0 / (near - far);
     return math.matrixFromColumns(
-        [fovFactor / aspect_ratio,	0,			0,									0],
-        [0,							fovFactor,	0,									0],
+        [1 / (aspect_ratio* fovFactor)  ,	0,			0,									0],
+        [0,							1 / fovFactor,	0,									0],
         [0,							0,			(near + far) * range_invariant,	    -1],
         [0,							0,			near * far * range_invariant * 2.,	0]
+    );
+}
+
+function orthographic_mtx(left, right, bottom, top, near, far) {
+    return math.matrixFromColumns(
+        [2 / (right - left),              0,                               0,                           0],
+        [0,                               2 / (top - bottom),              0,                           0],
+        [0,                               0,                               2 / (near - far),            0],
+        [(left + right) / (left - right), (bottom + top) / (bottom - top), (near + far) / (near - far), 1],
     );
 }

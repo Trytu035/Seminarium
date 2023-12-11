@@ -1,4 +1,5 @@
 var vertexShader = `#version 300 es
+precision highp float;
 	in vec4 a_position;
 	in vec3 a_tangents;
 	in vec3 a_bitangents;
@@ -9,16 +10,18 @@ var vertexShader = `#version 300 es
 	// in vec2 a_texcoordScale;
 	// out vec2 v_texcoordScale;
 	uniform vec2 u_mouse;
+	out vec2 v_mouse;
 	out vec4 v_position;
-	struct depth_range_t{
-		float near;
-		float far;
-	};
-	out depth_range_t v_projected_depth_range;
+	// struct depth_range_t{
+	// 	float near;
+	// 	float far;
+	// };
+	// out depth_range_t v_projected_depth_range;
 	// out gl_DepthRangeParameters v_projected_depth_range;
 	
 	uniform mat4 u_model_matrix;
 	uniform mat4 u_camera_matrix;
+	uniform mat4 u_projection_matrix;	//addded
 	uniform mat4 u_world_view_projection;
 	uniform mat4 u_world_inverse_transpose;
 	
@@ -31,7 +34,8 @@ var vertexShader = `#version 300 es
 	
 	out mat3 v_TBN;
 	
-	out vec3 v_fragment_position;
+	out vec4 v_fragment_position;
+	out vec4 v_ndc;
 	
 	uniform int u_temp_use_the_oclussion;  //sometimes usable
 	out float v_temp_use_the_oclussion;
@@ -39,8 +43,8 @@ var vertexShader = `#version 300 es
 	mat4 perspective(float fieldOfViewInRadians, float near, float far, float aspect_ratio);
 	
 	void main(){
-		v_projected_depth_range.near = 0.01;
-		v_projected_depth_range.far = 30.0;
+		// v_projected_depth_range.near = 0.01;
+		// v_projected_depth_range.far = 30.0;
 		// v_projected_depth_range.diff = v_projected_depth_range.far - v_projected_depth_range.near;
 
 		
@@ -59,7 +63,7 @@ var vertexShader = `#version 300 es
 	    // );
 	    
 	    // v_world_view_projection = v_projection_matrix * v_view_matrix * v_model_matrix;
-		v_world_inverse_transpose = transpose(inverse(v_model_matrix));
+		// v_world_inverse_transpose = transpose(inverse(v_model_matrix));
 		
 	
 	//https://www.youtube.com/watch?time_continue=269&v=EpADhkiJkJA&embeds_referring_euri=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dparalax%2Bmapping%2Bimplementation%2Bopengl%26sca_esv%3D576631001%26sxsrf%3DAM9HkKmHyi5MKpR1r8D8c_UJGQn5A5YVxA&source_ve_path=MTM5MTE3LDEzOTExNywyODY2Ng&feature=emb_logo&ab_channel=thebennybox
@@ -71,26 +75,34 @@ var vertexShader = `#version 300 es
 		// vec3 b = cross(n, t);	//b = cross(n, t)
 		// vec3 n = normalize(cross(t, b));
 		v_TBN = mat3(t, b, n);
+		// v_TBN = mat3(t, b, normalize(vec3(1., 0.8, 0.5)));
 		v_TBN = inverse(transpose(v_TBN));
 
-    	v_fragment_position = v_TBN * vec3(v_model_matrix * a_position);
+    	// v_fragment_position = v_TBN * vec3(v_model_matrix * a_position);
 
 //https://webglfundamentals.org/webgl/lessons/webgl-3d-orthographic.html
 //https://learnopengl.com/Advanced-Lighting/Normal-Mapping
         
 		// gl_Position = v_world_view_projection * a_position;
-		
+		v_mouse = u_mouse;
 		v_normals = a_normals;
     	v_temp_use_the_oclussion = float(u_temp_use_the_oclussion);
 		v_texcoord = a_texcoord;
 		// v_texcoordScale = a_texcoordScale;
 		v_position = a_position;
 		v_camera_matrix = u_camera_matrix;
+		v_projection_matrix = u_projection_matrix;
 		v_world_view_projection = u_world_view_projection;
 		v_model_matrix = u_model_matrix;
+    	v_fragment_position = vec4(v_model_matrix * a_position);
 		v_world_inverse_transpose = u_world_inverse_transpose;
 		
-		gl_Position = u_world_view_projection * a_position;
+		mat4 world_view_projection = u_projection_matrix * inverse(v_camera_matrix) * v_model_matrix;
+		
+		// gl_Position = u_world_view_projection * a_position;
+		gl_Position = world_view_projection * a_position;
+		v_ndc = gl_Position;
+		// v_ndc.w = v_ndc.w /2. + 0.5;	// from -1 - 1 to 0 - 1
 	}
 
 	mat4 perspective(float fieldOfViewInRadians, float near, float far, float aspect_ratio) {

@@ -1,5 +1,6 @@
 var fragmentShaderLambertian = `#version 300 es
-precision lowp float;
+precision highp float;
+// precision lowp float;
 in vec4 v_position;
 // in mat4 v_model_matrix;
 in vec3 v_normals;
@@ -11,6 +12,8 @@ in vec4 v_fColor;
 // uniform sampler2D u_normal_detail_texture;
 // uniform sampler2D u_height_map_texture;
 // uniform sampler2D u_color_texture;
+uniform float u_near_plane;
+uniform float u_far_plane;
 
 in float v_temp_use_the_oclussion;
 
@@ -27,6 +30,16 @@ out vec4 output_FragColor;
 
 mat4 rotate_y(float angle);
 mat4 rotate_z(float angle);
+
+//https://www.omnicalculator.com/math/vector-projection
+vec3 project(vec3 a, vec3 overB) {   //projects vector a, over vector b, resulting in vector b of length  of vector a projected on b
+	return dot(a, overB) / dot(overB, overB) * overB;
+}
+struct depth_range_t {
+    float near;
+    float far;
+};
+in depth_range_t v_projected_depth_range;
 
 void main(){
     vec2 texcoord = v_texcoord;
@@ -68,6 +81,15 @@ void main(){
 	output_FragColor = vec4(0.5, 0., 1., 1.);
 	//vec3 basic = texture(u_normal_texture, texcoord).rgb*(0.5 + v_normalToCamera);
 	// output_FragColor = vec4(basic.rgb + v_position.xyz, 1);
+	output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 1.0)), 1);
+    // output_FragColor = vec4(
+    //     vec3(pow(
+    //         (
+    //             1./length(project(v_camera_matrix[3].xyz - v_position.xyz, v_camera_matrix[2].xyz))  //z plane distance
+    //             - 1./u_near_plane
+    //         ) / (1./u_far_plane - 1./u_near_plane)
+    //     , 5000.0)) // - vec3(pow(gl_FragCoord.z, 500.0))
+    // , 1.);
 }
 
 mat4 rotate_y(float angle) {

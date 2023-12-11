@@ -17,13 +17,14 @@ function main() {
     // );
         () => {
             console.log("done");
-            init(canvas, gl).then(
-                () => {
-                    loop(canvas, gl);
-                }
-            ).catch(
-                (error) => { console.error(error); }
-            );
+            init(canvas, gl);   //loop is executed inside init
+            //     .then(
+            //     () => {
+            //         loop(canvas, gl);
+            //     }
+            // ).catch(
+            //     (error) => { console.error(error); }
+            // );
         }
     ).catch(
         (error) => { console.error(error); }
@@ -31,11 +32,6 @@ function main() {
 }
 
 let mouseUniformLocation;
-let rotateUniformLocation;
-let cameraRotationUniformLocation;
-let distanceUniformLocation;
-let texcoordScaleAttributeLocation;
-let normalDetailTextureLocation;
 
 let mainVAO; // Vertex Attribute Object
 let lambertianVAO;
@@ -58,182 +54,7 @@ class Camera {
     }
 }
 
-class Model {
-    constructor(material) {
-        this.material = material;
-        this.positions = [];
-        this.texcoords = [];
-        this.tangents = [];
-        this.bitangents = [];
-        this.normals = [];
-        this.model_matrix = new math.identity(4);
-        this.VAO = material.gl.createVertexArray();
-        this.textures = [];
-        this.images = [];
-        // this.attributeLocation;
-        // this.computeFlatNormals();
-    }
-
-    translate(x, y, z) {
-        math.multiply([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0],
-            [x, y, z, 1]
-        ], this.model_matrix);
-    }
-
-    scale(x, y, z) {
-        math.multiply([
-            [x, 0, 0, 0],
-            [0, y, 0, 0],
-            [0, 0, z, 0],
-            [0, 0, 0, 1]
-        ], this.model_matrix);
-    }
-
-    rotate(x, y, z) {
-        if (x) math.multiply([
-            [1.0,	0.0,	0.0,	0.0],
-            [0.0,	cos(x), sin(x),	0.0],
-            [0.0,	-sin(x),cos(x),	0.0],
-            [0.0,	0.0,	0.0,	1.0]
-        ], this.model_matrix);
-        if (y) math.multiply([
-            [cos(y),0.0,	-sin(y),0.0],
-            [0.0,	1.0,	0.0,	0.0],
-            [sin(y),0.0,	cos(y),	0.0],
-            [0.0,	0.0,	0.0,	1.0]
-        ], this.model_matrix);
-        if (z) math.multiply([
-            [cos(z),    sin(z),	0.0,	0.0],
-            [-sin(z),   cos(z),	0.0,	0.0],
-            [0.0,		0.0,	1.0,	0.0],
-            [0.0,		0.0,	0.0,	1.0]
-        ], this.model_matrix);
-    }
-
-    init() {
-        this.material.gl.bindVertexArray(this.VAO);
-    }
-    computeFlatNormals() {
-        for (let i2 = 0; i2 < this.positions.length / 9; i2++) { //i2 repeat for each triangle //divide by 3 coordinates, 3 vertices in triangle,
-            let edge1 = new Vector3( this.positions[(i2*3 + 1)*3],  this.positions[(i2*3 + 1)*3 + 1],  this.positions[(i2*3 + 1)*3 + 2]);
-              edge1.add(new Vector3(-this.positions[(i2*3    )*3], -this.positions[(i2*3    )*3 + 1], -this.positions[(i2*3    )*3 + 2]));
-            let edge2 = new Vector3( this.positions[(i2*3 + 2)*3],  this.positions[(i2*3 + 2)*3 + 1],  this.positions[(i2*3 + 2)*3 + 2]);
-              edge2.add(new Vector3(-this.positions[(i2*3    )*3], -this.positions[(i2*3    )*3 + 1], -this.positions[(i2*3    )*3 + 2]));
-            let deltaUV1 = new Vector2( this.texcoords[(i2*3 + 1)*2],  this.texcoords[(i2*3 + 1)*2 + 1]);
-              deltaUV1.add(new Vector2(-this.texcoords[(i2*3    )*2], -this.texcoords[(i2*3    )*2 + 1]));
-            let deltaUV2 = new Vector2( this.texcoords[(i2*3 + 2)*2],  this.texcoords[(i2*3 + 2)*2 + 1]);
-              deltaUV2.add(new Vector2(-this.texcoords[(i2*3    )*2], -this.texcoords[(i2*3    )*2 + 1]));
-
-            let f = 1.0 / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-            // https://learnopengl.com/Advanced-Lighting/Normal-Mapping
-            for (let i = 0; i < 3; i++) {   //repeat for each vertex in a triangle
-                //can we cut out f factor?? does vector normalization suffice?
-                //tangent (X) for some reason i had to reverse it
-                this.tangents[(i2*3 + i) * 3    ] = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-                this.tangents[(i2*3 + i) * 3 + 1] = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-                this.tangents[(i2*3 + i) * 3 + 2] = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-                //bitangent (Y)
-                this.bitangents[(i2*3 + i) * 3    ] = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-                this.bitangents[(i2*3 + i) * 3 + 1] = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-                this.bitangents[(i2*3 + i) * 3 + 2] = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-                //normal(Z)
-                this.normals[(i2*3 + i) * 3    ] = f * (edge1.y*edge2.z - edge1.z*edge2.y);
-                this.normals[(i2*3 + i) * 3 + 1] = f * (edge1.z*edge2.x - edge1.x*edge2.z); //negative through sauron method - it's a cross product ??
-                this.normals[(i2*3 + i) * 3 + 2] = f * (edge1.x*edge2.y - edge1.y*edge2.x);
-
-                // console.log(edge1.length() / deltaUV1.length() + " ---- " + edge2.length() / deltaUV2.length());
-                // this.textureScales[(i2*3 + i)*2] = edge1.length() / deltaUV1.length();
-                // this.textureScales[(i2*3 + i)*2 + 1] = edge2.length() / deltaUV2.length();
-            }
-        }
-        this.material.gl.bindVertexArray(this.VAO);
-        let tangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.tangents), this.material.gl.STATIC_DRAW);
-        let bitangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.bitangents), this.material.gl.STATIC_DRAW);
-        let normalsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.normals), this.material.gl.STATIC_DRAW);
-        let positionsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.positions), this.material.gl.STATIC_DRAW);
-        let texcoordsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.texcoords), this.material.gl.STATIC_DRAW);
-
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.tangent);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.normal);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.normal, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.position);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.position, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-
-    }
-    draw() {
-
-    }
-}
-class Material {
-    constructor(glContext, vertexShader, fragmentShader) {
-        this.gl = glContext;
-        this.program = createProgram(
-            glContext,
-            createShader(glContext, vertexShader, glContext.VERTEX_SHADER),
-            createShader(glContext, fragmentShader, glContext.FRAGMENT_SHADER)
-        );
-        this.location = {
-            attribute: {
-                position: this.gl.getAttribLocation(this.program, "a_position"),
-                // color: this.gl.getAttribLocation(this.program, "a_color"),
-                tangent: this.gl.getAttribLocation(this.program, "a_tangents"),
-                bitangent: this.gl.getAttribLocation(this.program, "a_bitangents"),
-                normal: this.gl.getAttribLocation(this.program, "a_normals"),
-                texcoord: this.gl.getAttribLocation(this.program, "a_texcoord"),
-            },
-            uniform: {
-                mvp: this.gl.getUniformLocation(this.program, "u_world_view_projection"),
-                world_inv_transpose: this.gl.getUniformLocation(this.program, "u_world_inverse_transpose"),
-                model: this.gl.getUniformLocation(this.program, "u_model_matrix"),
-                camera: this.gl.getUniformLocation(this.program, "u_camera_matrix"),
-            },
-            texture: {},    //usually uniforms filled inside addTexture
-            // other: {},
-        }
-    }
-    // addLocation()
-//    to add location, use "material.location.other.locationName = gl.getUniform/AttribLocation( [...]
-}
-
 let temporaryLocation_1;
-// Positions format: - remember that points should turn anti-clockwise
-// x1, y1, z1
-// x2, y2, z2
-// x3, y3, z3
-// x1, y1, z1
-// x3, y3, z3
-// x4, y4, z4
-let positions = []
-// Texcoords format:
-// u1, v1
-// u2, v2
-// u3, v3
-// u1, v1
-// u3, v3
-// u4, v4
 
 function radToDeg(value) {
     return value / Math.PI * 180
@@ -311,15 +132,24 @@ let program;
 let program2;
 let program3;
 
+let images = [];
+
 let material1;  //paralax snow
 let materialLambertian;  //paralax snow
+let materialDepth;  //paralax snow
 let model1;
 let model2;
+let snow_projection_plane;
+
+
 async function init(canvas, gl) {
     material1 = new Material(gl, vertexShader, fragmentShader);
-    model1 = new Model(material1);
     materialLambertian = new Material(gl, vertexShader, fragmentShaderLambertian);
+    materialDepth = new Material(gl, vertexShader, fragmentShaderDepth);
+    model1 = new Model(material1);
     model2 = new Model(materialLambertian);
+    snow_projection_plane = new Model(materialDepth);
+    snow_projection_plane.center = new Vector3(0, 0, 4);
     {
         generateFace(
             model1, new Vector3(0, 4, 0),
@@ -355,6 +185,11 @@ async function init(canvas, gl) {
             // texcoords, new Vector3(0, -1, 0), new Vector3(1, 0, 0),
             // 2, -2, 1, 1
         );
+        generateFace(   //Z face side-right
+            model1, new Vector3(2, 1, 0),
+            new Vector3(1, 0, -1).normalize(), new Vector3(0, 1, 0),
+            2*Math.sqrt(2), 2, 1
+        );
         generateFace(   //X face front
             model1, new Vector3(1, 1, 0),
             new Vector3(0, 0, -1), new Vector3(0, 1, 0),
@@ -364,7 +199,7 @@ async function init(canvas, gl) {
         generateFace(   // Y face
             model1, new Vector3(2, 0, 0),
             new Vector3(1, 0, 0), new Vector3(0, 0, -1),
-            2, 20
+            20, 20
         );
 
         generateFace(
@@ -411,15 +246,21 @@ async function init(canvas, gl) {
         new Vector3(1, 0, 0), new Vector3(0, 0, -1),
         3, 3, 4
     );
+    generateFace(
+        model2, new Vector3(0, 0.5, 0.5),
+        new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+        0.5, 0.5, 1
+    );
+    generateFace(
+        snow_projection_plane, snow_projection_plane.center,
+        // new Vector3(1, 0, 0), new Vector3(0, -1, 0),
+        new Vector3(1, 1, 0), new Vector3(1, -1, -1),
+        7, 7, 1
+    );
 
     model1.computeFlatNormals();
     model2.computeFlatNormals();
-    // program3 = createProgram(
-    //     gl,
-    //     createShader(gl, vertexShader, gl.VERTEX_SHADER),
-    //     createShader(gl, fragmentShaderDepth, gl.FRAGMENT_SHADER)
-    // );
-
+    snow_projection_plane.computeFlatNormals();
     depthVAO = gl.createVertexArray();
     // gl.bindVertexArray(mainVAO);
 
@@ -430,7 +271,7 @@ async function init(canvas, gl) {
     canvas.width = window.innerWidth / resolution;
     canvas.height = window.innerHeight / resolution;
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.5, 0.5, 0.5, 1);
+    gl.clearColor(0.5, 0.4, 0.3, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.CULL_FACE); //turn off for double sided and transparency
     gl.enable(gl.DEPTH_TEST);   //turn off for transparency
@@ -444,37 +285,67 @@ async function init(canvas, gl) {
     material1.location.texture.color = gl.getUniformLocation(material1.program, "u_color_texture");
     material1.location.texture.heightMap = gl.getUniformLocation(material1.program, "u_height_map_texture");
     material1.location.texture.normalDetail = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
-    render_normals_from_height_map(model1, "./height_map.png", 24, gl.TEXTURE1, material1.location.texture.normal, gl.RGBA, gl.RGBA).then(
-    // addTexture(model1, "./normal.png", gl.TEXTURE1, normalTextureLocation, gl.RGBA, gl.RGBA).then(
-        () => {
-            addTexture(model1, "./color.png", gl.TEXTURE2, material1.location.texture.color, gl.RGBA, gl.RGBA).then(
-            () => {
-                addTexture(model1, "./height_map.png", gl.TEXTURE3, material1.location.texture.heightMap, gl.RGBA, gl.RGBA).then(
-                    () => {
-                        // addTexture(model1, "./circuitry-detail-normal.png", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
-                        // addTexture(model1, "./9749-normal.jpg", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
-                        addTexture(model1, "./av53c33f80f8586a07900.png", gl.TEXTURE4, material1.location.texture.normalDetail, gl.RGBA, gl.RGBA);
-                    }
-                )
-            }
-        )}
-    )
-    // material1.location.uniform.displayProportion = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
+    material1.location.uniform.snowDirection = gl.getUniformLocation(material1.program, "u_snow_direction");
+
+    // /* useless */ materialDepth.location.texture.normal = gl.getUniformLocation(materialDepth.program, "u_normal_texture");
+    // /* useless */ materialDepth.location.texture.color = gl.getUniformLocation(materialDepth.program, "u_color_texture");
+    materialDepth.location.texture.heightMap = gl.getUniformLocation(materialDepth.program, "u_height_map_texture");
+    // /* useless */ materialDepth.location.texture.normalDetail = gl.getUniformLocation(materialDepth.program, "u_normal_detail_texture");
+
+    //load all images, then create image
+    addImage("./height_map.png", (image) => {
+        images["height_map"] = image;
+        addImage("./color.png", (image) => {
+            images["color"] = image;
+            addImage("./av53c33f80f8586a07900.png", (image) => {
+                images["normal_detail"] = image;
+                add_normals_from_height_map_image(images["height_map"], 24, (image) => {
+                    images["normal"] = image;
+                    addTexture(model1, images["normal"], gl.TEXTURE1, material1.location.texture.normal, gl.RGBA, gl.RGBA);
+                    addTexture(model1, images["color"], gl.TEXTURE2, material1.location.texture.color, gl.RGBA, gl.RGBA);
+                    addTexture(model1, images["height_map"], gl.TEXTURE3, material1.location.texture.heightMap, gl.RGBA, gl.RGBA);
+                    addTexture(model1, images["normal_detail"], gl.TEXTURE4, material1.location.texture.normalDetail, gl.RGBA, gl.RGBA);
+                    // addTexture(model2, images["height_map"], gl.TEXTURE1, materialDepth.location.texture.heightMap, gl.RGBA, gl.RGBA);
+                    //target texture for framebuffer
+                    addTexture(model2, null, gl.TEXTURE2, materialDepth.location.texture.heightMap, gl.RGBA, gl.RGBA, 1024, 1024);
+                    loop(canvas, gl);
+                });
+            });
+        });
+    })
+    // // addTexture(model1, "./circuitry-detail-normal.png", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
+    // // addTexture(model1, "./9749-normal.jpg", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
+    // addTexture(model1, "./av53c33f80f8586a07900.png", gl.TEXTURE4, material1.location.texture.normalDetail, gl.RGBA, gl.RGBA);
 }
 
-function loop(canvas, gl){
 
+var globalid = 5;
+
+
+function loop(canvas, gl){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     canvas.width = window.innerWidth / resolution;
     canvas.height = window.innerHeight / resolution;
+    let aspect_ratio = canvas.width / canvas.height;
+    // gl.viewport(0, 0, 100, 100);
     gl.viewport(0, 0, canvas.width, canvas.height);
 
-    gl.useProgram(material1.program);
-    gl.bindVertexArray(model1.VAO);
+    // gl.useProgram(material1.program);
+    // gl.bindVertexArray(model1.VAO);
+    // gl.uniform2f(mouseUniformLocation, mouseX, mouseY);
+    // gl.uniform1i(temporaryLocation_1, parseFloat(mouseState[0]));
 
-    // let camera_matrix = math.identity(4);
+    let id = globalid;
+
+    let zAxis = normalize_vec([model1.normals[id*3*6 + 0], model1.normals[id*3*6 + 1], model1.normals[id*3*6 + 2]])
+    let xAxis = normalize_vec(math.cross([0, 1, 1.01], zAxis));
+    let yAxis = normalize_vec(math.cross(zAxis, xAxis));
+
+    model2.rotate(0, 0, 0.01);// Date.now();
+
     let camera_matrix = math.identity(4);
     camera_matrix = math.multiply(translate_mtx(0, 0, zoom), camera_matrix);
-    camera_matrix = math.multiply(rotate_y_mtx(rotateX), rotate_x_mtx(rotateY), camera_matrix);
+    camera_matrix = math.multiply(rotate_y_mtx(rotateX), rotate_x_mtx(-rotateY), camera_matrix);
     math.subset(camera_matrix, math.index(2, [0, 1, 2]),
         normalize_vec(math.squeeze(math.subset(camera_matrix, math.index(3, [0, 1, 2])))));
     math.subset(camera_matrix, math.index(1, [0, 1, 2]), [0, 1, 0]);
@@ -489,47 +360,126 @@ function loop(canvas, gl){
             math.squeeze(math.subset(camera_matrix, math.index(0, [0, 1, 2]))),
         )));
     let view_matrix = math.inv(camera_matrix);
+    let near = 0.1;
+    let far = 20.0;
     let projection_matrix = perspective_mtx(
         degToRad(90.),
-        0.01,
-        30.0,
-        // v_projected_depth_range.near,
-        // v_projected_depth_range.far,
-        canvas.width / canvas.height
+        near,
+        far,
+        aspect_ratio
     );
+    let isProjectionPerspective = true;
 
-    let world_view_projection = math.multiply(projection_matrix, view_matrix);
-    world_view_projection = math.multiply(world_view_projection, model1.model_matrix);
-    // let world_view_projection = view_matrix;
-    // v_world_inverse_transpose = transpose(inverse(v_model_matrix));
-    // console.log(math.flatten(camera_matrix));
 
-    gl.uniformMatrix4fv(model1.material.location.uniform.mvp, true, math.flatten(world_view_projection)._data);
-    gl.uniformMatrix4fv(model1.material.location.uniform.world_inv_transpose, false, math.flatten(math.inv(model1.model_matrix))._data);
-    gl.uniformMatrix4fv(model1.material.location.uniform.camera, true, math.flatten(camera_matrix)._data);
-    gl.uniformMatrix4fv(model1.material.location.uniform.model, true, math.flatten(model1.model_matrix)._data);
-    // gl.uniform2f(, canvas.width, canvas.height);
+    /////////////////////////////orthogonal camera for projection plane
+    let snow_camera_matrix = math.identity(4);
+    snow_camera_matrix = math.multiply(math.matrixFromColumns(
+        [snow_projection_plane.tangents[0], snow_projection_plane.tangents[1], snow_projection_plane.tangents[2], 0],
+        [-snow_projection_plane.bitangents[0], -snow_projection_plane.bitangents[1], -snow_projection_plane.bitangents[2], 0],
+        [-snow_projection_plane.normals[0], -snow_projection_plane.normals[1], -snow_projection_plane.normals[2], 0],
+        // [snow_projection_plane.center.toArray(), 1].flat(),
+        [snow_projection_plane.center.x, snow_projection_plane.center.y, snow_projection_plane.center.z, 1],
+    ), snow_camera_matrix);
 
-    gl.uniform2f(mouseUniformLocation, mouseX, mouseY);
-    gl.uniform1i(temporaryLocation_1, parseFloat(mouseState[0]));
+    // projection_matrix = orthographic_mtx(-4*aspect_ratio, 4*aspect_ratio, -4, 4, near, far);
+    let snow_projection_matrix = orthographic_mtx(-4, 4, -4, 4, near, far);
+    // isProjectionPerspective = false;
+    // zamiast cyfr na sta³e, za³adowaæ pozycjê p³aszczyzny œniegowej -  zprojektowan¹ z kamery*
+
+    view_matrix = math.inv(camera_matrix);
+    let snow_view_matrix = math.inv(snow_camera_matrix);
+    projection_matrix = math.matrix(projection_matrix);
+    snow_projection_matrix = math.matrix(snow_projection_matrix);
+    let view_projection = math.multiply(projection_matrix, view_matrix);
+    let snow_view_projection = math.multiply(snow_projection_matrix, snow_view_matrix);
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    gl.drawArrays(gl.TRIANGLES, 0, model1.positions.length / 3); //type, offset, count (position.length/size)
+    // model1.material.location.other = { proj_plane: {snow_projection_plane.positions[0]}}
 
-    gl.useProgram(materialLambertian.program);
-    gl.bindVertexArray(model2.VAO);
-    gl.uniformMatrix4fv(model2.material.location.uniform.mvp, true, math.flatten(world_view_projection)._data);
-    gl.uniformMatrix4fv(model2.material.location.uniform.world_inv_transpose, false, math.flatten(math.inv(model2.model_matrix))._data);
-    gl.uniformMatrix4fv(model2.material.location.uniform.camera, true, math.flatten(camera_matrix)._data);
-    gl.uniformMatrix4fv(model2.material.location.uniform.model, true, math.flatten(model2.model_matrix)._data);
+    // gl.useProgram(materialDepth.program);
+    // gl.useProgram(model2.material.program);
 
-    gl.drawArrays(gl.TRIANGLES, 0, model2.positions.length / 3); //type, offset, count (position.length/size)
+    // console.log(model1.textures);
+    // console.log(model2.textures);
+    // const targetTexture = gl.createTexture();
+    let fb = gl.createFramebuffer();
+    // let rb = gl.createRenderbuffer();
+    // gl.activeTexture(gl.TEXTURE2);
+    // gl.bindTexture(gl.TEXTURE_2D, model2.textures[0].texture);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    // gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
 
-    gl.useProgram(material1.program);   //for some reason i have to end the drawing by this program.
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // images["frameBuffer"] = fb;
+    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, targetTexture, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, model2.textures[0].texture, 0);
+    // gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
+
+    // gl.uniform3f(material1.location.uniform.snowDirection, 0, 1, 0);
+    gl.uniform3f(material1.location.uniform.snowDirection,
+        -snow_projection_plane.normals[0],
+        -snow_projection_plane.normals[1],
+        -snow_projection_plane.normals[2]);
+    gl.viewport(0, 0, 1024, 1024);
+    [model2].forEach((model) => {   //draw moving actor and model in depth_buffer shader.
+        drawModel(gl, model, snow_view_projection, snow_camera_matrix, snow_projection_matrix, near, far, isProjectionPerspective);
+    });
+    gl.generateMipmap(gl.TEXTURE_2D);
+    setTexture(model2, model2.textures[0].texture, model2.material.location.texture.heightMap, gl.TEXTURE2);
+    // gl.uniform1i(materialDepth.location.texture.color, gl.TEXTURE2);
+    // gl.uniform1i(material1.location.texture.color, gl.TEXTURE0 - id - 1);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    [model1, model2, snow_projection_plane].forEach((model) => {
+        drawModel(gl, model, view_projection, camera_matrix, projection_matrix, near, far, isProjectionPerspective);
+    });
+
+    // gl.drawArrays(gl.TRIANGLES, 0, model1.positions.length / 3); //type, offset, count (position.length/size)
+    // gl.drawArrays(gl.TRIANGLES, 0, model2.positions.length / 3); //type, offset, count (position.length/size)
+
+    // gl.useProgram(materialDepth.program);   //for some reason i have to end the drawing by this program.
+    // gl.useProgram(material1.program);   //for some reason i have to end the drawing by this program.
     // Otherwise only one texture is loaded - why??
 
     gl.bindVertexArray(null);
     requestAnimationFrame(() => { loop(canvas, gl) });
+}
+
+function drawModel(gl, model, view_projection, camera_matrix, projection_matrix, near, far, isProjectionPerspective) {
+    let world_view_projection = math.multiply(view_projection, model.model_matrix);
+    let inverse_world_view_projection = math.inv(world_view_projection);
+
+    gl.useProgram(model.material.program);
+    gl.bindVertexArray(model.VAO);
+    gl.uniformMatrix4fv(model.material.location.uniform.mvp, true, math.flatten(world_view_projection)._data);
+    gl.uniformMatrix4fv(model.material.location.uniform.inv_mvp, true, math.flatten(inverse_world_view_projection)._data);
+    gl.uniformMatrix4fv(model.material.location.uniform.world_inv_transpose, false, math.flatten(math.inv(model.model_matrix))._data);
+    gl.uniformMatrix4fv(model.material.location.uniform.camera, true, math.flatten(camera_matrix)._data);
+    gl.uniformMatrix4fv(model.material.location.uniform.projection, true, math.flatten(projection_matrix)._data);
+    gl.uniformMatrix4fv(model.material.location.uniform.model, true, math.flatten(model.model_matrix)._data);
+    gl.uniform1f(model.material.location.uniform.near, near);
+    gl.uniform1f(model.material.location.uniform.far, far);
+    gl.uniform1f(model.material.location.uniform.projectionPerspective, isProjectionPerspective); //is projection perspective or orthographic
+    model.textures.forEach(textureInfo => {
+        setTexture(model, textureInfo.texture, textureInfo.location, textureInfo.id);
+        // if (textureInfo.location != null) {
+        //     gl.uniform1i(textureInfo.location, textureInfo.id - gl.TEXTURE1);
+        //     gl.activeTexture(textureInfo.id);
+        //     // console.log(textureInfo);
+        //     // console.log("0:" + gl.TEXTURE0);
+        //     gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+        // }
+    });
+
+    gl.drawArrays(gl.TRIANGLES, 0, model.positions.length / 3); //type, offset, count (position.length/size)
+
+    // gl.activeTexture(null);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 function defineGlAttribute(name, value) {
@@ -547,7 +497,7 @@ var mouseY = 0;
 var clickX = 0;
 var clickY = 0;
 var rotateX = degToRad(0);
-var rotateY = degToRad(20);
+var rotateY = degToRad(0);
 var rotateZ = degToRad(0);
 var zoom = 5;
 var oldRotateX = rotateX;
@@ -588,9 +538,95 @@ if (e.which == 1) {
 window.addEventListener("mousewheel", function (e) {
 if (e.deltaY > 0 && zoom < 10) {
     zoom += .1;
-} else if (e.deltaY < 0 && zoom > 1) {
+} else if (e.deltaY < 0 && zoom > 0.11) {
     zoom -= .1;
 }
 })
 
 main();
+
+
+//      x,      y,      z,      w
+// x	1,      0,      0,      0
+// y	0,      1,      0,      0
+// z	0,      0,      1,      0
+// w	0,      0,      0,      1
+
+//      x,      y,      z,      w
+// x	1,      0,      0,      0
+// y	0,      1,      0,      0
+// z	0,      0,      1,      0
+// w	0,      0,      0,      1
+
+//      x,      y,      z,      w
+// x	xx,     yx,     zx,     wx
+// y	xy,     yy,     zy,     wy
+// z	xz,     yz,     zz,     wz
+// w	xpos,   ypos,   zpos,   scale
+
+// w /= matrix
+
+// A * B
+//      prevX,  prevY,  prevZ,      w           x,      y,      z,      w
+// x	xx,     yx,     zx,     wx              xx,     yx,     zx,     wx
+// y	xy,     yy,     zy,     wy      *       xy,     yy,     zy,     wy
+// z	xz,     yz,     zz,     wz              xz,     yz,     zz,     wz
+// w	xpos,   ypos,   zpos,   scale           xpos,   ypos,   zpos,   scale
+
+// (in my case it will be transposed) as collumn vectors in rows
+// prev X = (xx*n_xx + xy*n_yx + xz*n_zx
+
+// prev X = (xx*n_xx + xy*n_yx + xz*n_zx
+
+// apply transformation:
+// transformation * data_matrix = result_matrix
+// other_transformation * result_matrix = result
+// other_transformation * transformation * data_matrix = result
+
+// A transpose:
+// for vectors a and b:
+// A * x * y = x * A^T * y
+
+
+
+
+// A * B
+//      prevX,  prevY,  prevZ,      w           x,      y,      z,      w
+// x	xx,     yx,     zx,     wx              0.1,     0,      0,      0
+// y	xy,     yy,     zy,     wy      *       0,      0.1,     0,      0
+// z	xz,     yz,     zz,     wz              0,      0,      -0.1,   -1
+// w	xpos,   ypos,   zpos,   scale           0,      0,      0,      1
+
+
+// prevX = (x*0.1, y*0.1, z*-0.1 - x_pos, x_pos)
+// prevY = (x*0.1, y*0.1, z*-0.1 - y_pos, y_pos)
+// prevZ = (x*0.1, y*0.1, z*-0.1 - z_pos, z_pos)
+//w     = (0,     0,     0,      scale)
+
+// prevX = (x*0.1, y*0.1, z*-0.1 - x_pos, x_pos)
+// prevY = (x*0.1, y*0.1, z*-0.1 - y_pos, y_pos)
+// prevZ = (x*0.1, y*0.1, z*-0.1 - z_pos, z_pos)
+
+//prevX = (x*0.1, y*0.1, z*-0.1, -z + x_pos)
+//prevY = (x*0.1, y*0.1, z*-0.1, -z + y_pos)
+//prevZ = (x*0.1, y*0.1, z*-0.1, -z + z_pos)
+//w     = (0,     0,     0,      scale)
+
+
+//      prevX,  prevY,  prevZ,  w               x,      y,      z,      w
+// x	xx,     yx,     zx,     wx              1,      0,      0,      x
+// y	xy,     yy,     zy,     wy      *       0,      1,      0,      y
+// z	xz,     yz,     zz,     wz              0,      0,      1,      z
+// w	xpos,   ypos,   zpos,   scale           0,      0,      0,      1
+
+
+//prevX = (xx + x*xpos, xy + y*xpos, xz + z*xpos, x_pos)
+//prevY = (x*0.1, y*0.1, z*-0.1, -z + y_pos)
+//prevZ = (x*0.1, y*0.1, z*-0.1, -z + z_pos)
+
+
+//      prevX,  prevY,  prevZ,  w               x,      y,      z,      w
+// x	xx,     yx,     zx,     wx              1,      0,      0,      0
+// y	xy,     yy,     zy,     wy      *       0,      1,      0,      0
+// z	xz,     yz,     zz,     wz              0,      0,      1,      0
+// w	xpos,   ypos,   zpos,   scale           0,      0,      0,      1
