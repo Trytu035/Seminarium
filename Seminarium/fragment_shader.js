@@ -15,7 +15,6 @@ uniform sampler2D u_height_map_texture;
 uniform sampler2D u_color_texture;
 uniform float u_near_plane;
 uniform float u_far_plane;
-uniform float u_is_perspective;
 
 in float v_temp_use_the_oclussion;
 
@@ -107,8 +106,6 @@ void main(){
     vec2 delta_uv = view_direction.xy * step_height / -view_direction.z;
     //https://apoorvaj.io/exploring-bump-mapping-with-webgl/
     // vec2 delta_uv = vec2(0., 0.);
-    // vec3 view_direction_2 = world_view_direction * (mat3(rotate_z(1.) * rotate_y(1.)) * v_TBN); //tangent view direction
-    // vec3 view_direction_2 = world_view_direction * transpose(inverse(mat3(v_TBN[0], v_TBN[1], normalize(vec3(0.01, 1.0, 0.01))) )); //tangent view direction
     
     texcoord = ParallaxMapping(texcoord, view_direction, world_view_direction, 1.0, u_height_map_texture);
     
@@ -124,7 +121,7 @@ void main(){
 	normals = normalize(vec3(rotate_z(phi) * rotate_y(theta) * rotate_z(-phi) * vec4(normals, 0.0)));
 	// normals = vec3(normals.x, normals.y, clamp(normals.z, 0., 1.));  //clamp z
 	
-	//to reverse all normals, referse [0] and [1]
+	//to reverse all normals, reverse [0] and [1]
 	normals = normalize(mat3(TBN[0], -TBN[1], TBN[2]) * normals );
 	// normals = normalize(mat3(-TBN[0], TBN[1], TBN[2]) * normals );
     
@@ -145,7 +142,9 @@ void main(){
 	// output_FragColor = vec4((vec3(0., 0., 1.) * TBN) /2. + 0.5, 1);
 	// output_FragColor = vec4(((normals * TBN) /2. + 0.5)*normalToCamera, 1);
 	// output_FragColor = vec4(vec3((theta + phi)/5.), 1);
-	// output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
+	output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
+	// output_FragColor = vec4(texture(u_height_map_texture, v_texcoord).rgb, 1);
+	// output_FragColor = vec4((texcoord.xyx).rgb*normalToCamera, 1);
 	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
 
 	//https://stackoverflow.com/questions/42633685/glsl-how-to-calculate-a-ray-direction-using-the-projection-matrix
@@ -188,12 +187,11 @@ void main(){
     
     
     
-    // if (u_is_perspective > 0.5) {
         gl_FragDepth = (    //non linear, projected to camera z-plane
             1./length(project(v_camera_matrix[3].xyz - frag_position, v_camera_matrix[2].xyz))  //z plane distance
             - 1./u_near_plane
         ) / (1./u_far_plane - 1./u_near_plane);
-    // } else {
+
         float to_paralax_fragment = length(project(v_camera_matrix[3].xyz - frag_position, v_camera_matrix[2].xyz));
         float to_paralax_surface = length(project(v_camera_matrix[3].xyz - v_fragment_position.xyz, v_camera_matrix[2].xyz));
         float paralax_height = to_paralax_fragment - to_paralax_surface;    //not height-scale

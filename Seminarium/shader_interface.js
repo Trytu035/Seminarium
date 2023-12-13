@@ -24,6 +24,7 @@ class Model {
         this.VAO = material.gl.createVertexArray();
         this.textures = [];
         this.images = [];
+        this.clones = [];   //list of clones which are copies of this model (mirrors it)
         // this.attributeLocation;
         // this.computeFlatNormals();
     }
@@ -35,6 +36,7 @@ class Model {
             [0, 0, 1, 0],
             [x, y, z, 1]
         ), this.model_matrix);
+        this.broadcastMatrixToClones();
     }
 
     scale(x, y, z) {
@@ -44,6 +46,7 @@ class Model {
             [0, 0, z, 0],
             [0, 0, 0, 1]
         ), this.model_matrix);
+        this.broadcastMatrixToClones();
     }
 
     rotate(x, y, z) {
@@ -65,6 +68,7 @@ class Model {
             [0.0,		    0.0,	        1.0,	0.0],
             [0.0,		    0.0,	        0.0,	1.0]
         ), this.model_matrix);
+        this.broadcastMatrixToClones();
     }
 
     init() {
@@ -137,6 +141,41 @@ class Model {
         this.material.gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
 
     }
+    copyModel(other, trace) {   //copies data from other model to this model (should be used after flat normals are computed), or computeFlatNormals would need to be called afterwards)
+        this.model_matrix = other.model_matrix;
+        this.positions = other.positions;
+        this.texcoords = other.texcoords;
+        this.computeFlatNormals();
+        if (trace === null || trace === undefined) {    //default - copy of the object will copy it's movement
+            other.clones.push(this);    //the original will copy it's properties to all copies;
+        }
+        // this.normals = other.normals;
+        // this.tangents = other.tangents;
+        // this.bitangents = other.bitangents;
+    }
+    castTextureCoordsFromViewProjection(viewProjection) {
+        this.material.gl.bindVertexArray(this.VAO);
+        for (let i = 0; i < this.texcoords.length / 2; i++) {
+            let position = math.matrix([this.positions[i*3], this.positions[i*3 + 1], this.positions[i*3 + 2], 1.0])
+            let texcoord = math.multiply(viewProjection, position);
+            // console.log(texcoord.get([1]));
+            this.texcoords[i*2] = texcoord.get([0]) / 2 + 0.5;
+            this.texcoords[i*2 + 1] = texcoord.get([1]) / 2 + 0.5;
+        }
+        // let texcoordsBuffer = this.material.gl.createBuffer();
+        // this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
+        // this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.texcoords), this.material.gl.STATIC_DRAW);
+        // this.material.gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
+        // this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
+        // this.material.gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        this.computeFlatNormals();
+    }
+    broadcastMatrixToClones() {
+        // console.log(this.clones);
+        this.clones.forEach((clone) => {
+            clone.model_matrix = this.model_matrix;
+        });
+    }
     draw() {
 
     }
@@ -167,7 +206,6 @@ class Material {
                 projection: this.gl.getUniformLocation(this.program, "u_projection_matrix"),
                 near: this.gl.getUniformLocation(this.program, "u_near_plane"),
                 far: this.gl.getUniformLocation(this.program, "u_far_plane"),
-                projectionPerspective: this.gl.getUniformLocation(this.program, "u_is_perspective"),
             },
             texture: {},    //usually uniforms filled inside addTexture
             // other: {},   //automatically resolved every frame??
@@ -221,7 +259,7 @@ function createProgram(gl, vertexShader, fragmentShader) {
 function addImage(source, callback) {   //add image to gl context
     let image = new Image();
 
-    if (typeof source === Image) {
+    if (typeof source === typeof new Image()) {
         image = source;
         callback();
         return image;
@@ -230,62 +268,22 @@ function addImage(source, callback) {   //add image to gl context
     image.addEventListener('load', () => { callback(image) });
 }
 
-//create and add Texture to model
-async function addTexture2(model, source, id, textureLocation, internalFormat, format, callback) {
+//add Texture to model
+function addTexture(model, name, image, id, textureLocation, internalFormat, format, sizeX, sizeY, isLinear, callback) {
     let gl = model.material.gl;
     let texture = gl.createTexture();
 
     gl.bindVertexArray(model.VAO);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    // Fill the texture with a 1x1 blue pixel.
-    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-        new Uint8Array([0, 0, 255, 255]));
-    let image = new Image();
-    image.src = source;
-    await image.addEventListener('load', function () {
-        // Now that the image has loaded make copy it to the texture.
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+    if (isLinear === true) {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    } else {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, format, gl.UNSIGNED_BYTE, image);
-        // model.images.push(image);
-        gl.generateMipmap(gl.TEXTURE_2D);
-        if (callback !== undefined) {
-            console.log(callback);
-            callback();
-        }
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    });
-    // console.log("id: " + id);
-    model.textures.push({texture: texture, id: id, location: textureLocation});
-    gl.activeTexture(id);   //find binding between texture (indexed in array) to id and textureLocation
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    if (textureLocation == null) {
-        console.log("texturelocation " + (id - gl.TEXTURE1) + " is null");
-        console.trace();
     }
-    else {
-        // id from gl.TEXTURE1 should have textureLocation 0
-        //move to loop - attach to model
-        gl.uniform1i(textureLocation, id - gl.TEXTURE1);
-    }
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.bindVertexArray(null);
-}
-
-function addTexture(model, image, id, textureLocation, internalFormat, format, sizeX, sizeY, callback) {
-    let gl = model.material.gl;
-    let texture = gl.createTexture();
-
-    gl.bindVertexArray(model.VAO);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     if (sizeX && sizeY) {
         gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, sizeX, sizeY, 0, format, gl.UNSIGNED_BYTE, image);
@@ -296,13 +294,26 @@ function addTexture(model, image, id, textureLocation, internalFormat, format, s
     // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.generateMipmap(gl.TEXTURE_2D);
 
-    model.textures.push({ texture: texture, id: id, location: textureLocation });
+    // model.textures.push({ texture: texture, id: id, location: textureLocation });
+    model.textures[name] = { texture: texture, id: id, location: textureLocation };
 }
 
-function setTexture(model, texture, textureLocation, id, callback) {
-    let gl = model.material.gl;
+function setTexture(gl, textureInfo, id, location) {
+    let textureId;
+    let textureLocation;
 
-    gl.activeTexture(id);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.uniform1i(textureLocation, id - gl.TEXTURE0);
+    if (id !== undefined && id !== null) {
+        textureId = id;
+    } else {
+        textureId = textureInfo.id;
+    }
+    if (location !== undefined && location !== null) {
+        textureLocation = location;
+    } else {
+        textureLocation = textureInfo.location;
+    }
+    gl.activeTexture(textureId);
+    gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+    console.log()
+    gl.uniform1i(textureLocation, textureId - gl.TEXTURE0);
 }

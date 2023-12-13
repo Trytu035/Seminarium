@@ -16,7 +16,7 @@ async function init_render_normals_from_height_map() {
     const gl = canvas.getContext("webgl2");
     const create_normals_program = createProgram(
         gl,
-        createShader(gl, vertexShaderRenderNormalsFromHeightMap, gl.VERTEX_SHADER),
+        createShader(gl, vertexShaderNoTransform, gl.VERTEX_SHADER),
         createShader(gl, fragmentShaderRenderNormalsFromHeightMap, gl.FRAGMENT_SHADER)
     );
     normalsGlInfo.material.gl = gl;
@@ -67,10 +67,10 @@ async function add_normals_from_height_map_image(source, slope_strength, callbac
     // if (offscreenGl == null) {
     //     console.error("offscreenCanvas context is not set to webgl2, change context to webgl2, or change offscreen check to match current behaviour.")
     // }
-    addTexture(normalsGlInfo, image, normalsGlInfo.material.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.material.gl.RGBA, normalsGlInfo.material.gl.RGBA);
+    addTexture(normalsGlInfo, "", image, normalsGlInfo.material.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.material.gl.RGBA, normalsGlInfo.material.gl.RGBA);
 
     normalsGlInfo.textures.forEach((textureInfo) => {
-        setTexture(normalsGlInfo, textureInfo.texture, textureInfo.location, textureInfo.id);
+        setTexture(normalsGlInfo.material.gl, textureInfo);
     });
     normalsGlInfo.material.gl.clear(normalsGlInfo.material.gl.COLOR_BUFFER_BIT | normalsGlInfo.material.gl.DEPTH_BUFFER_BIT);
     normalsGlInfo.material.gl.uniform1f(normalsGlInfo.slopeStrengthLocation, slope_strength);
