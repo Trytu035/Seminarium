@@ -63,10 +63,7 @@ async function add_normals_from_height_map_image(source, slope_strength, callbac
         console.error("expected image source instead of given url source" + source);
         return null;
     }
-    // offscreenGl = offscreenCanvas.getContext("webgl2");
-    // if (offscreenGl == null) {
-    //     console.error("offscreenCanvas context is not set to webgl2, change context to webgl2, or change offscreen check to match current behaviour.")
-    // }
+
     addTexture(normalsGlInfo, "", image, normalsGlInfo.material.gl.TEXTURE1, normalsGlInfo.textureLocation, normalsGlInfo.material.gl.RGBA, normalsGlInfo.material.gl.RGBA);
 
     normalsGlInfo.textures.forEach((textureInfo) => {
@@ -75,8 +72,5 @@ async function add_normals_from_height_map_image(source, slope_strength, callbac
     normalsGlInfo.material.gl.clear(normalsGlInfo.material.gl.COLOR_BUFFER_BIT | normalsGlInfo.material.gl.DEPTH_BUFFER_BIT);
     normalsGlInfo.material.gl.uniform1f(normalsGlInfo.slopeStrengthLocation, slope_strength);
     normalsGlInfo.material.gl.drawArrays(normalsGlInfo.material.gl.TRIANGLES, 0, 6);
-    // offscreenGl.clear(offscreenGl.COLOR_BUFFER_BIT | offscreenGl.DEPTH_BUFFER_BIT);
-    // offscreenGl.uniform1f(slope_strength_location, slope_strength);
-    // offscreenGl.drawArrays(offscreenGl.TRIANGLES, 0, 6);
     callback(normalsGlInfo.canvas);
 }

@@ -56,9 +56,14 @@ void main(){
 	// normals = normalize(vec3(rotate_z(phi) * rotate_y(theta) * rotate_z(-phi) * vec4(normals, 0.0)));
 	// normals = vec3(normals.x, normals.y, clamp(normals.z, 0., 1.));  //clamp z
 	
-	vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * v_normals );
+	// vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * v_normals );
+	// vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * vec3(0., 0., 1.) );
+	vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], cross(v_TBN[0], v_TBN[1])) * vec3(0., 0., 1.) );
     
-    float normalToCamera = dot(normals, normalize(v_camera_matrix[2].xyz));
+    float normalToCamera = dot(normalize(normals), normalize(v_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normalize(v_normals), normalize(v_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normalize(v_TBN[2]), normalize(v_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normalize(cross(v_TBN[0], v_TBN[1])), normalize(v_camera_matrix[2].xyz));
 
 	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
 	// output_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
@@ -78,10 +83,10 @@ void main(){
 	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*(0.5 + normalToCamera/2.0), 1);
 	// output_FragColor = texture(u_normal_texture, texcoord);
-	output_FragColor = vec4(0.5, 0., 1., 1.);
+	output_FragColor = vec4(vec3(0.5, 0., 1.) * normalToCamera, 1.);
 	//vec3 basic = texture(u_normal_texture, texcoord).rgb*(0.5 + v_normalToCamera);
 	// output_FragColor = vec4(basic.rgb + v_position.xyz, 1);
-	output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 1.0)), 1);
+	// output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 1.0)), 1);
     // output_FragColor = vec4(
     //     vec3(pow(
     //         (

@@ -38,9 +38,9 @@ class Vector3 {
     }
     crossProduct(other){
         return new Vector3(
-            this.y * oter.z - this.z * other.y,
-            this.z * oter.x - this.x * other.z,
-            this.x * oter.y - this.y * other.x,
+            this.y * other.z - this.z * other.y,
+            this.z * other.x - this.x * other.z,
+            this.x * other.y - this.y * other.x,
         )
     }
     add(other) {

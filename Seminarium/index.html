@@ -14,8 +14,9 @@
             top: 0px;
         }
     </style>
-<!-- npm install mathjs -->
     <script src="math.js" type="text/javascript"></script>
+    <script src="learn_webgl_vector3.js" type="text/javascript"></script>
+    <script src="obj_to_arrays.js" type="text/javascript"></script>
 </head>
 <body>
     <canvas id="canvas"></canvas>
@@ -23,7 +24,7 @@
     <script id="shader-interface" src="shader_interface.js"></script>
 
     <!--main shaders-->
-    <script id="vertex-shader" src="vertex_shader.js"></script>
+    <script id="vertex-shader-snow" src="vertex_shader_snow.js"></script>
     <script id="fragment-shader" src="fragment_shader.js"></script>
 
     <!--shaders generating normal texture-->
@@ -32,13 +33,19 @@
     <script id="fragment-shader-copy" src="fragment_shader_render_normals_from_height_map.js"></script>
 
     <!--other shaders-->
+    <script id="vertex-shader" src="vertex_shader.js"></script>
     <script id="fragment-shader-depth" src="fragment_shader_paralax_depth_buffer.js"></script>
     <script id="fragment-shader-depth-helper" src="fragment_shader_paralax_depth_buffer_helper.js"></script>
+    <script id="fragment-shader-depth-render-buffer-helper" src="fragment_shader_paralax_depth_buffer_render_buffer_helper.js"></script>
     <script id="fragment-shader-lambertian" src="fragment_shader_lambertian.js"></script>
+
+    <script id="capsule-object" src="capsule.obj.js"></script>
+    <script id="capsule-object" src="snooth_plane.obj.js"></script>
 
     <script src="render_normals_from_height_map.js"></script>
     <script src="script.js"></script>
-<!--    <script src="https://greggman.github.io/webgl-lint/webgl-lint.js" crossorigin></script>-->
-<!--    <img src="footprint.png" class="hidden"/>-->
 </body>
 </html>
+<!-- npm install mathjs -->
+<!--    <script src="https://greggman.github.io/webgl-lint/webgl-lint.js" crossorigin></script>-->
+<!--    <img src="footprint.png" class="hidden"/>-->
