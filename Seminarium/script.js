@@ -134,6 +134,12 @@ let modelCapsuleInDepth;
 let modelPlane;
 let modelPlaneInDepthTransform;
 let snow_projection_plane;
+let snow_camera_matrix;
+let snow_projection_matrix;
+let snow_view_matrix;
+let snow_view_projection;
+let snow_height_scale = 1.0;
+let previous_height_scale = snow_height_scale;  //check if snow_height_scale has changed
 
 let heightMapFrameBuffer;
 let transformFrameBuffer;
@@ -154,11 +160,14 @@ function init(canvas, gl) {
     model1 = new Model(material1);
     model1Lambertian = new Model(materialLambertian);
     model1InDepthTransform = new Model(materialDepthHelper);
+    // model1.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0])
+    // model1.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[0])
+    model1.generateExampleModel();
 
-    modelSmoothPlane = new Model(material1);
-    modelSmoothPlane.copyModelFromOBJInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[1].triangles)
-    modelSmoothPlaneLambertian = new Model(materialLambertian);
-    modelSmoothPlaneInDepthTransform = new Model(materialDepthHelper);
+    // modelSmoothPlane = new Model(material1);
+    // modelSmoothPlane.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[1].triangles)
+    // modelSmoothPlaneLambertian = new Model(materialLambertian);
+    // modelSmoothPlaneInDepthTransform = new Model(materialDepthHelper);
 
     model2 = new Model(materialLambertian);
     model2InDepth = new Model(materialDepth);
@@ -167,125 +176,13 @@ function init(canvas, gl) {
     model3InDepth = new Model(materialDepth);
 
     modelCapsule = new Model(materialLambertian);
-    modelCapsule.copyModelFromOBJInfo(createModelsFromOBJ(capsuleObj, {}, null)[0].triangles);
+    modelCapsule.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0]);
     modelCapsuleInDepth = new Model(materialDepth);
 
     snow_projection_plane = new Model(materialDepth);
     snow_projection_plane.center = new Vector3(0, 6, 0);
     // snow_projection_plane.center = new Vector3(0, 0, 4);
     // snow_projection_plane.center = new Vector3(0, 0, -4);
-    {
-        generateFace(
-            model1, new Vector3(0, 4, 0),
-            new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-            2, 2, 4
-        );
-        generateFace(
-            model1, new Vector3(0, 4, 0),
-            new Vector3(1, 0, 0), new Vector3(0, 0, -1),
-            2, 2, 0.5
-            // 2, 2, 1
-        );
-        generateFace(   // Y face (middle) bottom
-            model1, new Vector3(0, 0, 0),
-            new Vector3(1, 0, 0), new Vector3(0, 0, 1),
-            2, 2, 1
-        );
-        generateFace(   //Z face back
-            model1, new Vector3(0, 1, -1),
-            new Vector3(-1, 0, 0), new Vector3(0, 1, 0),
-            4, 4, 1
-            // texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
-            // 2, -2, 1, 1
-        );
-        generateFace(   //X face back
-            model1, new Vector3(-1, 1, 0),
-            new Vector3(0, 0, 1), new Vector3(0, 1, 0), //inversed
-            2, 2, 1
-        );
-        generateFace(   //Z face front
-            model1, new Vector3(0, 1, 1),
-            new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-            2, 2, 1
-            // texcoords, new Vector3(0, -1, 0), new Vector3(1, 0, 0),
-            // 2, -2, 1, 1
-        );
-        generateFace(   //Z face side-right
-            model1, new Vector3(2, 1, 0),
-            new Vector3(1, 0, -1).normalize(), new Vector3(0, 1, 0),
-            2*Math.sqrt(2), 2, 1
-        );
-        generateFace(   //X face front
-            model1, new Vector3(1, 1, 0),
-            new Vector3(0, 0, -1), new Vector3(0, 1, 0),
-            2, 2, 1
-        );
-
-        generateFace(   // Y face
-            model1, new Vector3(2, 0, 0),
-            new Vector3(1, 0, 0), new Vector3(0, 0, -1),
-            20, 20
-        );
-
-        generateFace(
-            model1, new Vector3(-2, 0, 0),
-            new Vector3(1, 1, 1), new Vector3(1, 1, -1),
-            2, 4
-        );
-
-        // generateFace(
-        //     model1, new Vector3(1, -0.3, 0),
-        //     new Vector3(1, -0.5, -1), new Vector3(-1, 0, -1),
-        //     6, 6
-        // );
-
-        //bounding box
-        generateFace(   // X face right inside
-            model1, new Vector3(15, 0, 0),
-            new Vector3(0, 0, 1), new Vector3(0, 1, 0),
-            40, 40
-        );
-        generateFace(   // X face left inside
-            model1, new Vector3(-15, 0, 0),
-            new Vector3(0, 0, -1), new Vector3(0, 1, 0),
-            40, 40
-        );
-        generateFace(   // Y face top inside
-            model1, new Vector3(0, 15, 0),
-            new Vector3(1, 0, 0), new Vector3(0, 0, 1),
-            40, 40
-        );
-        generateFace(   // Y face bottom inside
-            model1, new Vector3(0, -15, 0),
-            new Vector3(-1, 0, 0), new Vector3(0, 0, 1),
-            40, 40
-        );
-        generateFace(   // Z face close inside
-            model1, new Vector3(0, 0, 15),
-            new Vector3(1, 0, 0), new Vector3(0, -1, 0),
-            40, 40
-        );
-        generateFace(   // Z face far inside
-            model1, new Vector3(0, 0, -15),
-            new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-            40, 40
-        );
-    }
-    generateFace(
-        model2, new Vector3(0, 3.1, 0),
-        new Vector3(1, 0, 0), new Vector3(0, 0, -1),
-        3, 3, 4
-    );
-    generateFace(
-        model2, new Vector3(0, 0.5, 0.4),
-        new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-        0.5, 0.5, 1
-    );
-    generateFace(
-        model3, new Vector3(0, - 1.1, 3.),
-        new Vector3(1, 0, 0), new Vector3(0, 0, -1),
-        2.5, 2.5, 1
-    );
     generateFace(
         snow_projection_plane, snow_projection_plane.center,
         new Vector3(1, 0, 0), new Vector3(0, -0.00, 1),
@@ -294,17 +191,36 @@ function init(canvas, gl) {
         7, 7, 1
     );
 
+    {
+        generateFace(
+            model2, new Vector3(0, 3.1, 0),
+            new Vector3(1, 0, 0), new Vector3(0, 0, -1),
+            3, 3, 4
+        );
+        generateFace(
+            model2, new Vector3(0, 0.5, 0.4),
+            new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+            0.5, 0.5, 1
+        );
+        generateFace(
+            model3, new Vector3(0, -1.1, 3.),
+            new Vector3(1, 0, 0), new Vector3(0, 0, -1),
+            2.5, 2.5, 1
+        );
+    }
+
     model1.translate(0, -0.5, 0);
+    // model1.translate(0, -0.5, 2);
     // model1.rotate(0.2, -0.5, 0.1);
-    // model1.scale(2, 2, 2);
+    // model1.scale(10, 2, 10);
     model1.applyTransformMatrix();
-    model1.computeFlatNormals();
+    model1.computeFlatNormals(true);
     model1InDepthTransform.copyModel(model1);
     model1Lambertian.copyModel(model1, false);
     model1Lambertian.translate(0, -0.99, 0);
-    modelSmoothPlaneInDepthTransform.copyModel(modelSmoothPlane);
-    modelSmoothPlaneLambertian.copyModel(modelSmoothPlane, false);
-    modelSmoothPlaneLambertian.translate(0, -0.99, 0);
+    // modelSmoothPlaneInDepthTransform.copyModel(modelSmoothPlane);
+    // modelSmoothPlaneLambertian.copyModel(modelSmoothPlane, false);
+    // modelSmoothPlaneLambertian.translate(0, -0.99, 0);
     model2.computeFlatNormals();
     model2InDepth.copyModel(model2);
     model3.computeFlatNormals();
@@ -319,7 +235,7 @@ function init(canvas, gl) {
     canvas.width = window.innerWidth / resolution;
     canvas.height = window.innerHeight / resolution;
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.5, 0.4, 0.3, 1);
+    gl.clearColor(0.5, 0.5, 0.5, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.CULL_FACE); //turn off for double sided and transparency
     gl.enable(gl.DEPTH_TEST);   //turn off for transparency
@@ -334,6 +250,7 @@ function init(canvas, gl) {
         // [snow_projection_plane.center.toArray(), 1].flat(),
         [snow_projection_plane.center.x, snow_projection_plane.center.y, snow_projection_plane.center.z, 1],
     ), snow_camera_matrix);
+    // snow_projection_matrix = orthographic_mtx(-4, 4, -4, 4, NEAR, FAR);
     snow_projection_matrix = orthographic_mtx(-8, 8, -8, 8, NEAR, FAR);
     snow_view_matrix = math.inv(snow_camera_matrix);
     snow_view_projection = math.multiply(snow_projection_matrix, snow_view_matrix);
@@ -344,18 +261,24 @@ function init(canvas, gl) {
     // transformFrameBuffer = gl.createFramebuffer();
     normalFrameBuffer = gl.createFramebuffer();
 
+    // setup material uniforms
     material1.location.texture.normal = gl.getUniformLocation(material1.program, "u_normal_texture");
     material1.location.texture.color = gl.getUniformLocation(material1.program, "u_color_texture");
     material1.location.texture.heightMap = gl.getUniformLocation(material1.program, "u_height_map_texture");
     material1.location.texture.normalDetail = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
     material1.location.uniform.snowDirection = gl.getUniformLocation(material1.program, "u_snow_direction");
+    material1.location.uniform.height_scale = gl.getUniformLocation(material1.program, "u_height_scale");
 
     materialGenerateNormals.location.texture.heightMap = gl.getUniformLocation(materialGenerateNormals.program, "u_height_map_texture");
     materialGenerateNormals.location.uniform.slopeStrenth = gl.getUniformLocation(materialGenerateNormals.program, "u_slope_strength");
     materialDepthRenderBuffer.location.texture.heightMap = gl.getUniformLocation(materialDepthRenderBuffer.program, "u_height_map_texture");
+    materialDepthRenderBuffer.location.uniform.height_scale = gl.getUniformLocation(materialDepthRenderBuffer.program, "u_height_scale");
 
     /* height transform */ materialDepthHelper.location.texture.heightMap = gl.getUniformLocation(materialDepthHelper.program, "u_height_map_texture");  //initial snow height map
     /* result height */ materialDepth.location.texture.heightMap = gl.getUniformLocation(materialDepth.program, "u_height_map_texture");        //only at init?
+    materialDepth.location.uniform.height_scale = gl.getUniformLocation(materialDepth.program, "u_height_scale");        //only at init?
+    gl.useProgram(materialDepth.program);
+    gl.uniform1f(materialDepth.location.uniform.height_scale, snow_height_scale);
     // /* useless */ materialDepth.location.texture.normalDetail = gl.getUniformLocation(materialDepth.program, "u_normal_detail_texture");
     //load all images, then create image
     addImage("./height_map.png", (image) => {
@@ -401,12 +324,16 @@ function init(canvas, gl) {
                 gl.bindTexture(gl.TEXTURE_2D, model1InDepthTransform.textures["height_transform_framebuffer"].texture)
                 gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
 
+                gl.colorMask(false, false, false, false);
                 gl.depthFunc(gl.ALWAYS); //overwrite depth buffer here
                 initModel(gl, modelFullScreenRenderBuffer, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-                gl.useProgram(materialDepthRenderBuffer.program); //draw normals as post processing effect
+                gl.useProgram(materialDepthRenderBuffer.program);
+                gl.uniform1f(materialDepthRenderBuffer.location.uniform.height_scale, snow_height_scale);
                 gl.bindVertexArray(modelFullScreenRenderBuffer.VAO);
                 setTexture(gl, model1InDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialDepthRenderBuffer.location.texture.heightMap);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
+                gl.depthFunc(gl.LESS); //overwrite depth buffer here
+                gl.colorMask(true, true, true, true );
 
                 model1.material.location.attribute.texcoord_color = gl.getAttribLocation(model1.material.program, "a_texcoord_color");
                 model1.material.location.attribute.tangent_color = gl.getAttribLocation(model1.material.program, "a_tangents_color");
@@ -432,11 +359,6 @@ function init(canvas, gl) {
 
 var globalid = 5;
 
-var snow_camera_matrix;
-var snow_projection_matrix;
-var snow_view_matrix;
-var snow_view_projection;
-
 function loop(canvas, gl){
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     canvas.width = window.innerWidth / resolution;
@@ -448,6 +370,26 @@ function loop(canvas, gl){
     // gl.uniform2f(mouseUniformLocation, mouseX, mouseY);
     gl.useProgram(material1.program);
     gl.uniform1i(temporaryLocation_1, parseFloat(mouseState[0]));
+    gl.uniform1f(material1.location.uniform.height_scale, snow_height_scale);
+    if (previous_height_scale !== snow_height_scale){    //refresshes render buffer - TODO: refresh render buffer, but make paralax look the same after changing height_scale
+        previous_height_scale = snow_height_scale;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
+        gl.viewport(0, 0, textureSize, textureSize);
+        gl.colorMask(false, false, false, false);
+        gl.depthFunc(gl.ALWAYS); //overwrite depth buffer here
+        initModel(gl, modelFullScreenRenderBuffer, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
+        gl.useProgram(materialDepthRenderBuffer.program);
+        gl.uniform1f(materialDepthRenderBuffer.location.uniform.height_scale, snow_height_scale);
+        gl.bindVertexArray(modelFullScreenRenderBuffer.VAO);
+        setTexture(gl, model1InDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialDepthRenderBuffer.location.texture.heightMap);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.depthFunc(gl.LESS); //overwrite depth buffer here
+        gl.colorMask(true, true, true, true );
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        gl.useProgram(materialDepth.program);
+        gl.uniform1f(materialDepth.location.uniform.height_scale, snow_height_scale);
+    }
 
     let id = globalid;
 
@@ -539,7 +481,7 @@ function loop(canvas, gl){
     // gl.viewport(0, 0, textureSize, textureSize); //unnecessary - same sized texture
     gl.useProgram(materialGenerateNormals.program); //draw normals as post processing effect
     gl.bindVertexArray(modelFullScreenNormals.VAO);
-    gl.uniform1f(materialGenerateNormals.location.uniform.slopeStrenth, textureSize / 7.); //good aproximation of slope (picked by eye)
+    gl.uniform1f(materialGenerateNormals.location.uniform.slopeStrenth, textureSize / 7. * snow_height_scale); //good aproximation of slope (picked by eye)
     gl.drawArrays(gl.TRIANGLES, 0, 6);   // 2 coordinates per vertex
 
     gl.useProgram(material1.program);
@@ -553,7 +495,7 @@ function loop(canvas, gl){
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     // gl.bindRenderbuffer(gl.RENDERBUFFER, null);
     [
-        model1,// model1Lambertian,
+        model1, model1Lambertian,
         // modelSmoothPlane, modelSmoothPlaneLambertian,
         model2,
         model3, modelCapsule
@@ -600,10 +542,12 @@ var mouseX = 0;
 var mouseY = 0;
 var clickX = 0;
 var clickY = 0;
-var rotateX = degToRad(0);
-var rotateY = degToRad(0);
+// var rotateX = degToRad(0);
+// var rotateY = degToRad(0);
+var rotateX = 0.59;
+var rotateY = -0.55;
 var rotateZ = degToRad(0);
-var zoom = 5;
+var zoom = 3;
 var oldRotateX = rotateX;
 var oldRotateY = rotateY;
 var mouseState = [0, 0];
@@ -648,89 +592,3 @@ if (e.deltaY > 0 && zoom < 10) {
 })
 
 main();
-
-
-//      x,      y,      z,      w
-// x	1,      0,      0,      0
-// y	0,      1,      0,      0
-// z	0,      0,      1,      0
-// w	0,      0,      0,      1
-
-//      x,      y,      z,      w
-// x	1,      0,      0,      0
-// y	0,      1,      0,      0
-// z	0,      0,      1,      0
-// w	0,      0,      0,      1
-
-//      x,      y,      z,      w
-// x	xx,     yx,     zx,     wx
-// y	xy,     yy,     zy,     wy
-// z	xz,     yz,     zz,     wz
-// w	xpos,   ypos,   zpos,   scale
-
-// w /= matrix
-
-// A * B
-//      prevX,  prevY,  prevZ,      w           x,      y,      z,      w
-// x	xx,     yx,     zx,     wx              xx,     yx,     zx,     wx
-// y	xy,     yy,     zy,     wy      *       xy,     yy,     zy,     wy
-// z	xz,     yz,     zz,     wz              xz,     yz,     zz,     wz
-// w	xpos,   ypos,   zpos,   scale           xpos,   ypos,   zpos,   scale
-
-// (in my case it will be transposed) as collumn vectors in rows
-// prev X = (xx*n_xx + xy*n_yx + xz*n_zx
-
-// prev X = (xx*n_xx + xy*n_yx + xz*n_zx
-
-// apply transformation:
-// transformation * data_matrix = result_matrix
-// other_transformation * result_matrix = result
-// other_transformation * transformation * data_matrix = result
-
-// A transpose:
-// for vectors a and b:
-// A * x * y = x * A^T * y
-
-
-
-
-// A * B
-//      prevX,  prevY,  prevZ,      w           x,      y,      z,      w
-// x	xx,     yx,     zx,     wx              0.1,     0,      0,      0
-// y	xy,     yy,     zy,     wy      *       0,      0.1,     0,      0
-// z	xz,     yz,     zz,     wz              0,      0,      -0.1,   -1
-// w	xpos,   ypos,   zpos,   scale           0,      0,      0,      1
-
-
-// prevX = (x*0.1, y*0.1, z*-0.1 - x_pos, x_pos)
-// prevY = (x*0.1, y*0.1, z*-0.1 - y_pos, y_pos)
-// prevZ = (x*0.1, y*0.1, z*-0.1 - z_pos, z_pos)
-//w     = (0,     0,     0,      scale)
-
-// prevX = (x*0.1, y*0.1, z*-0.1 - x_pos, x_pos)
-// prevY = (x*0.1, y*0.1, z*-0.1 - y_pos, y_pos)
-// prevZ = (x*0.1, y*0.1, z*-0.1 - z_pos, z_pos)
-
-//prevX = (x*0.1, y*0.1, z*-0.1, -z + x_pos)
-//prevY = (x*0.1, y*0.1, z*-0.1, -z + y_pos)
-//prevZ = (x*0.1, y*0.1, z*-0.1, -z + z_pos)
-//w     = (0,     0,     0,      scale)
-
-
-//      prevX,  prevY,  prevZ,  w               x,      y,      z,      w
-// x	xx,     yx,     zx,     wx              1,      0,      0,      x
-// y	xy,     yy,     zy,     wy      *       0,      1,      0,      y
-// z	xz,     yz,     zz,     wz              0,      0,      1,      z
-// w	xpos,   ypos,   zpos,   scale           0,      0,      0,      1
-
-
-//prevX = (xx + x*xpos, xy + y*xpos, xz + z*xpos, x_pos)
-//prevY = (x*0.1, y*0.1, z*-0.1, -z + y_pos)
-//prevZ = (x*0.1, y*0.1, z*-0.1, -z + z_pos)
-
-
-//      prevX,  prevY,  prevZ,  w               x,      y,      z,      w
-// x	xx,     yx,     zx,     wx              1,      0,      0,      0
-// y	xy,     yy,     zy,     wy      *       0,      1,      0,      0
-// z	xz,     yz,     zz,     wz              0,      0,      1,      0
-// w	xpos,   ypos,   zpos,   scale           0,      0,      0,      1

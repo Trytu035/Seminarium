@@ -51,25 +51,33 @@ precision highp float;
 		vec3 t = (mat3(u_world_inverse_transpose) * a_tangents);
 		vec3 b = (mat3(u_world_inverse_transpose) * a_bitangents);
 		// vec3 n = (mat3(u_world_inverse_transpose) * a_normals) / sqrt(length(cross(t, b)));	//dlaczego sqrt??
+		vec3 n = (mat3(u_world_inverse_transpose) * a_normals);
 		vec3 t_color = (mat3(u_world_inverse_transpose) * a_tangents_color);
 		vec3 b_color = (mat3(u_world_inverse_transpose) * a_bitangents_color);
 		// vec3 n_color = (mat3(u_world_inverse_transpose) * a_normals_color) / sqrt(length(cross(t_color, b_color)));	//dlaczego sqrt??
-		// t = normalize(t - dot(t, n) * n);	//orthogonalize by Gram–Schmidt process
-		// b = normalize(b - dot(b, t) * t);
-		// vec3 b = cross(n, t);	//b = cross(n, t)
+		vec3 n_color = (mat3(u_world_inverse_transpose) * a_normals_color);
+
 		// vec3 n = normalize(cross(t, b));
+		// v_TBN = mat3(t, b, n);
 		// v_TBN = mat3(normalize(t), normalize(b), normalize(n));
+
+			// float t_len = length(t);
+			// float b_len = length(b);
+			// t = normalize(t - dot(t, n) * n) * t_len;	//orthogonalize by Gram–Schmidt process
+			// b = normalize(b - dot(b, n) * n) * b_len;
+			// // b = normalize(cross(n, t)) * b_len;
+			// // t = cross(b, n);
+
 		v_TBN = mat3(t, b, u_snow_direction);	//set paralax to point at snow plane direction
-		// v_TBN_color = mat3(t_color, b_color, n_color);	//if projected from normal paralax bends in oneself - 
 		v_TBN_color = mat3(t_color, b_color, u_snow_direction);	//if projected from normal paralax bends in oneself - 
-		
-			// v_TBN[2] = normalize(n);
-		// if (determinant(v_TBN) == 0.) {   // if TBN is invalid, add fraction of normal.
-		// 	v_TBN[2] = n * 1.01 + v_TBN[2];
-		// 	v_TBN_color[2] = n_color * 1.01 + v_TBN_color[2];
-    	// }
-		
-		v_TBN = inverse(transpose(v_TBN));				//for not normalized TBN use inverse(transpose(TBN))
+
+		// v_TBN = mat3(vec3(1., 0., 0.), vec3(0., 0., 1.), vec3(0., 1., 0.));	//set paralax to point at snow plane direction
+		// v_TBN = mat3(t, b, n);
+		// v_TBN_color = mat3(t_color, b_color, n_color);	//if projected from normal paralax bends in oneself - 
+
+		// v_TBN = inverse(transpose(v_TBN));				//for not normalized TBN use inverse(transpose(TBN))
+		// v_TBN[2] = u_snow_direction / 250.;
+		v_TBN = inverse(transpose(v_TBN));
 		v_TBN_color = inverse(transpose(v_TBN_color));	//for not normalized TBN use inverse(transpose(TBN))
 
     	// v_fragment_position = v_TBN * vec3(v_model_matrix * a_position);
@@ -90,6 +98,5 @@ precision highp float;
 		// gl_Position = u_world_view_projection * a_position;
 		gl_Position = world_view_projection * a_position;
 		v_ndc = gl_Position;
-		// v_ndc.w = v_ndc.w /2. + 0.5;	// from -1 - 1 to 0 - 1
 	}
 	`

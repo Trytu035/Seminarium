@@ -65,6 +65,8 @@ function TrianglesData() {
     self.vertices = [];       // a Float32Array; 3 components per vertex (x,y,z)
     self.colors = [];         // a Float32Array; 3 components per vertex RGB
     self.flat_normals = [];   // a Float32Array; 3 components per vertex <dx,dy,dz>
+    self.smooth_tangents = []; // a Float32Array; 3 components per vertex <dx,dy,dz>
+    self.smooth_bitangents = []; // a Float32Array; 3 components per vertex <dx,dy,dz>
     self.smooth_normals = []; // a Float32Array; 3 components per vertex <dx,dy,dz>
     self.textures = [];       // a Float32Array; 2 components per vertex (s,t)
     self.material = null;     // a Material object
@@ -82,6 +84,9 @@ function ModelArrays(name) {
     self.points = null;   // a PointsData object, if the model contains points
     self.lines = null;    // a LinesData object, if the model contains lines
     self.triangles = null;// a TrianglesData object, it the model contains triangles
+    self.all_vertices = null;// a TrianglesData object, it the model contains triangles
+    self.all_texture_coords = null;// a TrianglesData object, it the model contains triangles
+    self.all_triangles = [];// a TrianglesData object, it the model contains triangles
 }
 
 //-------------------------------------------------------------------------
@@ -248,6 +253,10 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
     // All arrays have an empty entry in index 0 because OBJ indexes start at 1.
     var all_vertices = [[]];
     var all_colors = null;
+    var all_tangents = [[]];
+    var avg_tangents = null;
+    var all_bitangents = [[]];
+    var avg_bitangents = null;
     var all_normals = [[]];
     var avg_normals = null;
     var all_texture_coords = [[]];
@@ -333,8 +342,8 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
 
     //-----------------------------------------------------------------------
     function _parseFaces(sp) {
-        var index_list, numberTriangles, triangles, n, edge1, edge2,
-            normal, normal_index;
+        var index_list, numberTriangles, triangles, n, edge1, edge2, deltaUV1, deltaUV2,
+            temp, tangent, bitangent, normal, normal_index;
 
         if (current_model.triangles === null) {
             current_model.triangles = new TrianglesData();
@@ -343,12 +352,13 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
 
         triangles = current_model.triangles;
 
+
         // Get the indexes of the vertices that define the face
         index_list = [];
         while (sp.getIndexes(vertex_indexes)) {
             index_list.push(vertex_indexes.slice());
         }
-
+        current_model.all_triangles.push(index_list);
         // Create the face triangles.
         numberTriangles = index_list.length - 2;
         n = 1;
@@ -373,17 +383,37 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
             // If normal vectors not in OBJ data:
             //   the flat_normal is set to the calculated face normal.
             //   the smooth_normals is set to an average normal if smoothing is on.
-            if (index_list[0][2] === -1) {
+            // if (index_list[0][2] === -1) {
                 // There was no normal vector in the OBJ file; calculate a normal vector
                 // using a counter-clockwise vertex winding.
                 // Only calculate one normal for faces with more than 3 vertices
                 if (n === 1) {
                     edge1 = vector.createFrom2Points(all_vertices[index_list[0][0]], all_vertices[index_list[n][0]]);
                     edge2 = vector.createFrom2Points(all_vertices[index_list[n][0]], all_vertices[index_list[n + 1][0]]);
+                    deltaUV1 = vector.createFrom2Points(all_texture_coords[index_list[0][1]], all_texture_coords[index_list[n][1]]);
+                    deltaUV2 = vector.createFrom2Points(all_texture_coords[index_list[n][1]], all_texture_coords[index_list[n + 1][1]]);
+
+                    let f = 1.0 / (deltaUV1[0] * deltaUV2[1] - deltaUV2[0] * deltaUV1[1]);
+
+                    temp = new Float32Array(3);
+                    tangent = new Float32Array(3);
+                    vector.scale(tangent, edge1, deltaUV2[1]);
+                    vector.scale(temp, edge2, -deltaUV1[1]);
+                    vector.add(tangent, tangent, temp);
+                    vector.scale(tangent, tangent, f);
+
+                    bitangent = new Float32Array(3);
+                    vector.scale(bitangent, edge1, -deltaUV2[0]);
+                    vector.scale(temp, edge2, deltaUV1[0]);
+                    vector.add(bitangent, bitangent, temp);
+                    vector.scale(bitangent, bitangent, f);
+
                     normal = new Float32Array(3);
                     vector.crossProduct(normal, edge1, edge2);
                     vector.normalize(normal);
 
+                    all_tangents.push(tangent);
+                    all_bitangents.push(bitangent);
                     all_normals.push(normal);
                     normal_index = all_normals.length - 1;
                 }
@@ -395,6 +425,12 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                 if (smooth_shading) {
                     // These indexes point to the vertex so the average normal vector
                     // can be accessed later
+                    triangles.smooth_tangents.push(-index_list[0][0]);
+                    triangles.smooth_tangents.push(-index_list[n][0]);
+                    triangles.smooth_tangents.push(-index_list[n + 1][0]);
+                    triangles.smooth_bitangents.push(-index_list[0][0]);
+                    triangles.smooth_bitangents.push(-index_list[n][0]);
+                    triangles.smooth_bitangents.push(-index_list[n + 1][0]);
                     triangles.smooth_normals.push(-index_list[0][0]);
                     triangles.smooth_normals.push(-index_list[n][0]);
                     triangles.smooth_normals.push(-index_list[n + 1][0]);
@@ -403,16 +439,16 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                     triangles.smooth_normals.push(normal_index);
                     triangles.smooth_normals.push(normal_index);
                 }
-            } else {
-                // Use the normal vector from the OBJ file
-                triangles.flat_normals.push(index_list[0][2]);
-                triangles.flat_normals.push(index_list[n][2]);
-                triangles.flat_normals.push(index_list[n + 1][2]);
-
-                triangles.smooth_normals.push(index_list[0][2]);
-                triangles.smooth_normals.push(index_list[n][2]);
-                triangles.smooth_normals.push(index_list[n + 1][2]);
-            }
+            // } else {
+            //     // Use the normal vector from the OBJ file
+            //     triangles.flat_normals.push(index_list[0][2]);
+            //     triangles.flat_normals.push(index_list[n][2]);
+            //     triangles.flat_normals.push(index_list[n + 1][2]);
+            //
+            //     triangles.smooth_normals.push(index_list[0][2]);
+            //     triangles.smooth_normals.push(index_list[n][2]);
+            //     triangles.smooth_normals.push(index_list[n + 1][2]);
+            // }
             n += 1; // if there is more than one triangle
         }
     }
@@ -486,7 +522,7 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                         dz = sp.getFloat();
                         normal = new Float32Array([dx, dy, dz]);
                         vector.normalize(normal);
-                        all_normals.push(normal);
+                        // all_normals.push(normal);
                         break;
 
                     case 'vt':  // Read texture coordinates; only 1D or 2D
@@ -530,16 +566,19 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
 
         if (model_dictionary.number_models > 0) {
 
+            avg_tangents = new Array(all_vertices.length);
+            avg_bitangents = new Array(all_vertices.length);
             avg_normals = new Array(all_vertices.length);
             count_normals = new Array(all_vertices.length);
             used = new Array(all_vertices.length);
 
             for (j = 0; j < all_vertices.length; j += 1) {
+                avg_tangents[j] = new Float32Array([0, 0, 0]);
+                avg_bitangents[j] = new Float32Array([0, 0, 0]);
                 avg_normals[j] = new Float32Array([0, 0, 0]);
                 count_normals[j] = 0;
                 used[j] = [];
             }
-
             for (j = 0; j < model_dictionary.number_models; j += 1) {
                 model = model_dictionary[j];
 
@@ -556,6 +595,12 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                         if (used[vertex_index].indexOf(normal_index) < 0) {
                             used[vertex_index].push(normal_index);
                             count_normals[vertex_index] += 1;
+                            avg_tangents[vertex_index][0] += all_tangents[normal_index][0];
+                            avg_tangents[vertex_index][1] += all_tangents[normal_index][1];
+                            avg_tangents[vertex_index][2] += all_tangents[normal_index][2];
+                            avg_bitangents[vertex_index][0] += all_bitangents[normal_index][0];
+                            avg_bitangents[vertex_index][1] += all_bitangents[normal_index][1];
+                            avg_bitangents[vertex_index][2] += all_bitangents[normal_index][2];
                             avg_normals[vertex_index][0] += all_normals[normal_index][0];
                             avg_normals[vertex_index][1] += all_normals[normal_index][1];
                             avg_normals[vertex_index][2] += all_normals[normal_index][2];
@@ -565,6 +610,12 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                     // Divide by the count values to get an average normal
                     for (k = 0; k < avg_normals.length; k += 1) {
                         if (count_normals[k] > 0) {
+                            avg_tangents[k][0] /= count_normals[k];
+                            avg_tangents[k][1] /= count_normals[k];
+                            avg_tangents[k][2] /= count_normals[k];
+                            avg_bitangents[k][0] /= count_normals[k];
+                            avg_bitangents[k][1] /= count_normals[k];
+                            avg_bitangents[k][2] /= count_normals[k];
                             avg_normals[k][0] /= count_normals[k];
                             avg_normals[k][1] /= count_normals[k];
                             avg_normals[k][2] /= count_normals[k];
@@ -599,10 +650,10 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
     }
 
     //-----------------------------------------------------------------------
-    function _smoothNormalIndexesToValues(indexes) {
+    function _smoothNormalIndexesToValues(indexes, source_data) {
         var j, k, n, array, size, index;
 
-        if (indexes.length <= 0) {
+        if (indexes.length <= 0 || source_data === null || source_data.length <= 0) {
             return null;
         } else {
             size = indexes.length * 3;
@@ -618,7 +669,7 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                 } else {
                     index = -index;
                     for (k = 0; k < 3; k += 1, n += 1) {
-                        array[n] = avg_normals[index][k];
+                        array[n] = source_data[index][k];
                     }
                 }
             }
@@ -650,8 +701,12 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                 triangles.vertices = _indexesToValues(triangles.vertices, all_vertices, 3);
                 triangles.colors = _indexesToValues(triangles.colors, all_colors, 3);
                 triangles.flat_normals = _indexesToValues(triangles.flat_normals, all_normals, 3);
-                triangles.smooth_normals = _smoothNormalIndexesToValues(triangles.smooth_normals);
+                triangles.smooth_tangents = _smoothNormalIndexesToValues(triangles.smooth_tangents, avg_tangents);
+                triangles.smooth_bitangents = _smoothNormalIndexesToValues(triangles.smooth_bitangents, avg_bitangents);
+                triangles.smooth_normals = _smoothNormalIndexesToValues(triangles.smooth_normals, avg_normals);
                 triangles.textures = _indexesToValues(triangles.textures, all_texture_coords, 2);
+                current_model.all_texture_coords = all_texture_coords;
+                current_model.all_vertices = all_vertices;
             }
         }
     }
@@ -909,3 +964,150 @@ function createObjModelMaterials(data_string) {
     return material_dictionary;
 }
 
+function smoothNormals(vertices, texcoords, triangles_indices) {
+    let all_tangents = [];
+    let all_bitangents = [];
+    let all_normals = [];
+    let avg_tangents = [];
+    let avg_bitangents = [];
+    let avg_normals = [];
+    let used = [];
+    let count_normals = [];
+    let vector = new Learn_webgl_vector3();
+    let normal_indexes = [];
+
+    console.log(triangles_indices);
+    for (let i2 = 0; i2 < triangles_indices.length; i2++) { //i2 repeat for each triangle //divide by 3 coordinates
+        let numberTriangles = triangles_indices[i2].length - 2;
+        if (numberTriangles > 1) {
+            console.log(numberTriangles);
+        }
+        let n = 1;
+        while (n <= numberTriangles) {
+            // if (true) {
+            if (n === 1) {
+                let edge1 = vector.createFrom2Points(vertices[triangles_indices[i2][0][0]], vertices[triangles_indices[i2][n][0]]);
+                let edge2 = vector.createFrom2Points(vertices[triangles_indices[i2][n][0]], vertices[triangles_indices[i2][n + 1][0]]);
+                let deltaUV1 = vector.createFrom2Points(texcoords[triangles_indices[i2][0][1]], texcoords[triangles_indices[i2][n][1]]);
+                let deltaUV2 = vector.createFrom2Points(texcoords[triangles_indices[i2][n][1]], texcoords[triangles_indices[i2][n + 1][1]]);
+
+                // let f = 1.0 / (deltaUV1[0] * deltaUV2[1] - deltaUV2[0] * deltaUV1[1]);
+                let f = 1.0 / (deltaUV1[0] * deltaUV2[1] - deltaUV2[0] * deltaUV1[1]);
+
+                let temp = new Float32Array(3);
+                let tangent = new Float32Array(3);
+                vector.scale(tangent, edge1, deltaUV2[1]);
+                vector.scale(temp, edge2, -deltaUV1[1]);
+                vector.add(tangent, tangent, temp);
+                vector.scale(tangent, tangent, f);
+
+                let bitangent = new Float32Array(3);
+                vector.scale(bitangent, edge1, -deltaUV2[0]);
+                vector.scale(temp, edge2, deltaUV1[0]);
+                vector.add(bitangent, bitangent, temp);
+                vector.scale(bitangent, bitangent, f);
+
+                let normal = new Float32Array(3);
+                vector.crossProduct(normal, edge1, edge2);
+                vector.normalize(normal);
+                // vector.normalize(bitangent);
+                // vector.normalize(tangent);
+
+                normal_indexes.push(all_normals.length);
+                normal_indexes.push(all_normals.length);
+                normal_indexes.push(all_normals.length);
+                all_tangents.push(tangent);
+                all_bitangents.push(bitangent);
+                all_normals.push(normal);
+            }
+            // normal_indexes.push(all_normals.length - 1)
+            // console.log(tangent + "\n" + bitangent + "\n" + normal + "\n");
+            n += 1;
+        }
+    }
+    for (let j = 0; j < vertices.length; j += 1) {
+        avg_tangents[j] = new Float32Array([0, 0, 0]);
+        avg_bitangents[j] = new Float32Array([0, 0, 0]);
+        avg_normals[j] = new Float32Array([0, 0, 0]);
+        count_normals[j] = 0;
+        used[j] = [];
+    }
+    // if (model.triangles !== null) {
+    //     triangles = model.triangles;
+
+        // For every vertex, add all the normals for that vertex and count
+        // the number of triangles. Only use a particular normal vector once.
+        // for (let k = 0; k < triangles.vertices.length; k += 1) {
+    for (let k = 0; k < triangles_indices.length; k += 1) {
+        for (let j = 0; j < triangles_indices[k].length; j += 1) {
+            // vertex_index = triangles.vertices[k];
+            // normal_index = triangles.flat_normals[k];
+            let vertex_index = triangles_indices[k][j][0];
+            let normal_index = normal_indexes[k * 3 + j];
+            // let normal_index = triangles_indices[k][j][2];
+
+            // if ($.inArray(normal_index, used[vertex_index]) < 0) {
+            if (used[vertex_index].indexOf(normal_index) < 0) {
+                // used[vertex_index].push(normal_index);
+                count_normals[vertex_index] += 1;
+                avg_tangents[vertex_index][0] += all_tangents[normal_index][0];
+                avg_tangents[vertex_index][1] += all_tangents[normal_index][1];
+                avg_tangents[vertex_index][2] += all_tangents[normal_index][2];
+                avg_bitangents[vertex_index][0] += all_bitangents[normal_index][0];
+                avg_bitangents[vertex_index][1] += all_bitangents[normal_index][1];
+                avg_bitangents[vertex_index][2] += all_bitangents[normal_index][2];
+                avg_normals[vertex_index][0] += all_normals[normal_index][0];
+                avg_normals[vertex_index][1] += all_normals[normal_index][1];
+                avg_normals[vertex_index][2] += all_normals[normal_index][2];
+            }
+        }
+    }
+    // Divide by the count values to get an average normal
+    for (let j = 0; j < avg_normals.length; j += 1) {
+        if (count_normals[j] > 0) {
+              avg_tangents[j][0] /= count_normals[j];
+              avg_tangents[j][1] /= count_normals[j];
+              avg_tangents[j][2] /= count_normals[j];
+            avg_bitangents[j][0] /= count_normals[j];
+            avg_bitangents[j][1] /= count_normals[j];
+            avg_bitangents[j][2] /= count_normals[j];
+               avg_normals[j][0] /= count_normals[j];
+               avg_normals[j][1] /= count_normals[j];
+               avg_normals[j][2] /= count_normals[j];
+            // vector.normalize(avg_tangents[j]);
+            // vector.normalize(avg_bitangents[j]);
+            vector.normalize(avg_normals[j]);
+        }
+    }
+    let index;
+    let size = triangles_indices.flat().length * 3;
+    let smooth_tangents = new Float32Array(size);
+    let smooth_bitangents = new Float32Array(size);
+    let smooth_normals = new Float32Array(size);
+    let n = 0;
+    for (let j = 0; j < triangles_indices.length; j += 1) {
+        for (let i = 0; i < triangles_indices[j].length; i += 1) {
+        // for (let i = triangles_indices[j].length - 1; i >= 0 ; i -= 1) {
+            index = triangles_indices[j][i][0];
+            for (let k = 0; k < 3; k += 1, n += 1) {
+                if (avg_tangents[index] === undefined) {
+                    console.log(index);
+                    console.log(triangles_indices[j][i]);
+                    console.log(k);
+                    console.log(avg_tangents);
+                    console.log(vertices);
+                    console.log(texcoords);
+                }
+                smooth_tangents[n] = avg_tangents[index][k];
+                smooth_bitangents[n] = avg_bitangents[index][k];
+                smooth_normals[n] = avg_normals[index][k];
+                // smooth_tangents[n] = all_tangents[index][k];
+                // smooth_bitangents[n] = all_bitangents[index][k];
+                // smooth_normals[n] = all_normals[index][k];
+            }
+        }
+    }
+
+    return [smooth_tangents, smooth_bitangents, smooth_normals]
+    // return [smooth_tangents, smooth_bitangents, smooth_normals, texCoords, newVertices]
+}

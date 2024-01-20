@@ -2,7 +2,6 @@ var fragmentShaderLambertian = `#version 300 es
 precision highp float;
 // precision lowp float;
 in vec4 v_position;
-// in mat4 v_model_matrix;
 in vec3 v_normals;
 in float v_normalToCamera;
 in vec2 v_texcoord;
@@ -19,9 +18,9 @@ in float v_temp_use_the_oclussion;
 
 in vec3 v_fragment_position;
 
-in mat4 v_model_matrix;
-in mat4 v_camera_matrix;
-in mat4 v_view_matrix;
+uniform mat4 u_model_matrix;
+uniform mat4 u_camera_matrix;
+uniform mat4 u_view_matrix;
 in mat4 v_projection_matrix;
 in mat4 v_world_view_projection;
 in mat4 v_world_inverse_transpose;
@@ -60,10 +59,10 @@ void main(){
 	// vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * vec3(0., 0., 1.) );
 	vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], cross(v_TBN[0], v_TBN[1])) * vec3(0., 0., 1.) );
     
-    float normalToCamera = dot(normalize(normals), normalize(v_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normalize(v_normals), normalize(v_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normalize(v_TBN[2]), normalize(v_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normalize(cross(v_TBN[0], v_TBN[1])), normalize(v_camera_matrix[2].xyz));
+    float normalToCamera = dot(normalize(normals), normalize(u_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normalize(v_normals), normalize(u_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normalize(v_TBN[2]), normalize(u_camera_matrix[2].xyz));
+    // float normalToCamera = dot(normalize(cross(v_TBN[0], v_TBN[1])), normalize(u_camera_matrix[2].xyz));
 
 	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
 	// output_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
@@ -90,7 +89,7 @@ void main(){
     // output_FragColor = vec4(
     //     vec3(pow(
     //         (
-    //             1./length(project(v_camera_matrix[3].xyz - v_position.xyz, v_camera_matrix[2].xyz))  //z plane distance
+    //             1./length(project(u_camera_matrix[3].xyz - v_position.xyz, u_camera_matrix[2].xyz))  //z plane distance
     //             - 1./u_near_plane
     //         ) / (1./u_far_plane - 1./u_near_plane)
     //     , 5000.0)) // - vec3(pow(gl_FragCoord.z, 500.0))

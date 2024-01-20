@@ -10,3 +10,4 @@ void main () {
     output_FragColor = vec4(texture(u_texture, v_texcoord).xyz, 1.0);
 }
 `
+// this shader is unused
