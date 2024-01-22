@@ -56,8 +56,8 @@ precision highp float;
 		v_texcoord_color = a_texcoord_color;
 		v_position = a_position;
     	v_fragment_position = vec4(u_model_matrix * a_position);
-    	// v_light_direction = normalize(u_camera_matrix[2].xyz);
-    	v_light_direction = normalize(vec3(1., 1., 0.));
+    	v_light_direction = normalize(u_camera_matrix[2].xyz);
+    	// v_light_direction = normalize(vec3(1., 1., 0.));
 		
 		gl_Position = u_world_view_projection * a_position;
 		v_ndc = gl_Position;
