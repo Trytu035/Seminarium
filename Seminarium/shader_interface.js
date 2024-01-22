@@ -26,26 +26,24 @@ class Model {
         // this.images = [];
         this.clones = [];   //list of clones which are copies of this model (mirrors it)
         // this.attributeLocation;
-        // this.computeFlatNormals();
+        // this.computeNormals();
     }
 
     static createFullScreenModel(material) {  //default model for image processing
         let fullScreenModel = new Model(material);
         let gl = fullScreenModel.material.gl;
 
-        gl.bindVertexArray(fullScreenModel.VAO);
-
         fullScreenModel.positions = [-1, 1, -1,-1,  1,-1, -1, 1,  1,-1,  1, 1];
         fullScreenModel.texcoords = [ 0, 1,  0, 0,  1, 0,  0, 1,  1, 0,  1, 1];
+
+        gl.bindVertexArray(fullScreenModel.VAO);
         let positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fullScreenModel.positions), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(material.location.attribute.position);
         gl.vertexAttribPointer(material.location.attribute.position, 2, gl.FLOAT, 0, 0, 0);
-
         let textureBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-        // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([ 0, 1,  0, 0,  1, 1,  0, 0,  1, 1,  1, 0]), gl.STATIC_DRAW);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fullScreenModel.texcoords), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(material.location.attribute.texcoord);
         gl.vertexAttribPointer(material.location.attribute.texcoord, 2, gl.FLOAT, 0, 0, 0);
@@ -100,6 +98,10 @@ class Model {
         this.broadcastMatrixToClones();
     }
 
+    getTranslation() {
+        return math.transpose(this.model_matrix).valueOf()[3];
+    }
+
     init() {
         this.material.gl.bindVertexArray(this.VAO);
     }
@@ -111,7 +113,6 @@ class Model {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data_array), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(location);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.vertexAttribPointer(location, size, gl.FLOAT, 0, 0, 0);
     }
 
@@ -150,48 +151,44 @@ class Model {
         // }
     }
 
-    computeFlatNormals(isSmoothNormals) {
+    computeNormals(isSmoothNormals) {
         if (isSmoothNormals !== undefined && isSmoothNormals !== false && isSmoothNormals !== null && this.model_object !== undefined) {
             let temp = smoothNormals(this.model_object.all_vertices, this.model_object.all_texture_coords, this.model_object.all_triangles);
             this.tangents = Array.from(temp[0]);
             this.bitangents = Array.from(temp[1]);
             this.normals = Array.from(temp[2]);
-            // this.texcoords = Array.from(temp[3]);
-            // this.positions = Array.from(temp[4]);
         } else
         {
             this.flatNormals(this.positions, this.texcoords);
         }
+        let gl = this.material.gl;
 
-        this.material.gl.bindVertexArray(this.VAO);
-        let positionsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.positions), this.material.gl.STATIC_DRAW);
-        let texcoordsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.texcoords), this.material.gl.STATIC_DRAW);
-
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.position);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.position, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let tangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.tangents), this.material.gl.STATIC_DRAW);
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.tangent);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let bitangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.bitangents), this.material.gl.STATIC_DRAW);
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let normalsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.normals), this.material.gl.STATIC_DRAW);
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.normal);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.normal, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        gl.bindVertexArray(this.VAO);
+        let positionsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.position);
+        gl.vertexAttribPointer(this.material.location.attribute.position, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let texcoordsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texcoordsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texcoords), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
+        gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let tangentsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tangentsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.tangents), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.tangent);
+        gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let bitangentsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bitangentsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.bitangents), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
+        gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let normalsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.normal);
+        gl.vertexAttribPointer(this.material.location.attribute.normal, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
     }
 
     applyTransformMatrix() {    // If this function is going to be used, you can use copyModel only after this function is applied.
@@ -225,45 +222,40 @@ class Model {
         this.model_matrix = math.identity(4);
     }
 
-    copyModel(other, trace) {   //copies data from other model to this model (should be used after flat normals are computed), or computeFlatNormals would need to be called afterwards)
+    copyModel(other, trace) {   //copies data from other model to this model (should be used after flat normals are computed), or computeNormals would need to be called afterwards)
+        let gl = this.material.gl;
         this.model_matrix = other.model_matrix;
         this.positions = other.positions;
         this.texcoords = other.texcoords;
         this.normals = other.normals;
         this.tangents = other.tangents;
         this.bitangents = other.bitangents;
-        this.material.gl.bindVertexArray(this.VAO);
-        let tangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.tangents), this.material.gl.STATIC_DRAW);
-        let bitangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.bitangents), this.material.gl.STATIC_DRAW);
-        let normalsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.normals), this.material.gl.STATIC_DRAW);
-        let positionsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.positions), this.material.gl.STATIC_DRAW);
-        let texcoordsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.texcoords), this.material.gl.STATIC_DRAW);
-
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.tangent);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.normal);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.normal, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.position);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.position, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        gl.bindVertexArray(this.VAO);
+        let positionsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.position);
+        gl.vertexAttribPointer(this.material.location.attribute.position, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let texcoordsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texcoordsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texcoords), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
+        gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let tangentsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tangentsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.tangents), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.tangent);
+        gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let bitangentsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bitangentsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.bitangents), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
+        gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let normalsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.normal);
+        gl.vertexAttribPointer(this.material.location.attribute.normal, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
 
         if (trace === null || trace === undefined || trace === true) {    //default - copy of the object will copy it's movement
             other.clones.push(this);    //the original will copy it's properties to all copies;
@@ -300,9 +292,10 @@ class Model {
                     }
                 }
             }
-            this.computeFlatNormals(true);
+            this.computeNormals(true);
         } else {
-            this.computeFlatNormals(false);
+            console.log("casting flat normals - only objects generated by obj_to_arrays.js will have smooth normals");
+            this.computeNormals(false);
         }
     }
 
@@ -312,44 +305,40 @@ class Model {
     }
 
     copyModelFromOBJInfo(model) {
+        let gl = this.material.gl;
         this.flatNormals(Array.from(model.vertices), Array.from(model.textures));
         this.normals = Array.from(model.smooth_normals);
         this.positions = Array.from(model.vertices);
         this.texcoords = Array.from(model.textures);
 
-        this.material.gl.bindVertexArray(this.VAO);
-        let tangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.tangents), this.material.gl.STATIC_DRAW);
-        let bitangentsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, new Float32Array(this.bitangents), this.material.gl.STATIC_DRAW);
-        let normalsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, model.smooth_normals, this.material.gl.STATIC_DRAW);
-        let positionsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, model.vertices, this.material.gl.STATIC_DRAW);
-        let texcoordsBuffer = this.material.gl.createBuffer();
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.bufferData(this.material.gl.ARRAY_BUFFER, model.textures, this.material.gl.STATIC_DRAW);
-
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.tangent);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, tangentsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, bitangentsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.normal);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, normalsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.normal, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.position);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, positionsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.position, 3, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        this.material.gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
-        this.material.gl.bindBuffer(this.material.gl.ARRAY_BUFFER, texcoordsBuffer);
-        this.material.gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, this.material.gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        gl.bindVertexArray(this.VAO);
+        let positionsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, model.vertices, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.position);
+        gl.vertexAttribPointer(this.material.location.attribute.position, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let texcoordsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texcoordsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, model.textures, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
+        gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let tangentsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tangentsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.tangents), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.tangent);
+        gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let bitangentsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bitangentsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.bitangents), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
+        gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        let normalsBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER,model.smooth_normals, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(this.material.location.attribute.normal);
+        gl.vertexAttribPointer(this.material.location.attribute.normal, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
     }
+
 
     broadcastMatrixToClones() {
         // console.log(this.clones);
@@ -650,13 +639,10 @@ function addTexture(model, name, image, id, textureLocation, internalFormat, for
     } else {
         gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, format, gl.UNSIGNED_BYTE, image);
     }
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
     if (internalFormat != gl.RGBA16F && internalFormat != gl.RGBA16UI) {
         gl.generateMipmap(gl.TEXTURE_2D);
     }
-
-    // model.textures.push({ texture: texture, id: id, location: textureLocation });
     model.textures[name] = { texture: texture, id: id, location: textureLocation };
 }
 

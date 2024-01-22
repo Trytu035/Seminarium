@@ -14,16 +14,17 @@ in vec4 v_fColor;
 uniform float u_near_plane;
 uniform float u_far_plane;
 
-in float v_temp_use_the_oclussion;
+// uniform int u_temp_use_the_oclussion;
 
 in vec3 v_fragment_position;
+in vec3 v_light_direction;
 
 uniform mat4 u_model_matrix;
 uniform mat4 u_camera_matrix;
 uniform mat4 u_view_matrix;
-in mat4 v_projection_matrix;
-in mat4 v_world_view_projection;
-in mat4 v_world_inverse_transpose;
+// uniform mat4 u_projection_matrix;
+// uniform mat4 u_world_view_projection;
+// uniform mat4 u_world_inverse_transpose;
 
 out vec4 output_FragColor;
 
@@ -59,31 +60,31 @@ void main(){
 	// vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], v_TBN[2]) * vec3(0., 0., 1.) );
 	vec3 normals = normalize(mat3(v_TBN[0], -v_TBN[1], cross(v_TBN[0], v_TBN[1])) * vec3(0., 0., 1.) );
     
-    float normalToCamera = dot(normalize(normals), normalize(u_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normalize(v_normals), normalize(u_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normalize(v_TBN[2]), normalize(u_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normalize(cross(v_TBN[0], v_TBN[1])), normalize(u_camera_matrix[2].xyz));
+    float diffusion = dot(normalize(normals), v_light_direction);
+    // float diffusion = dot(normalize(v_normals), v_light_direction);
+    // float diffusion = dot(normalize(v_TBN[2]), v_light_direction);
+    // float diffusion = dot(normalize(cross(v_TBN[0], v_TBN[1])), v_light_direction);
 
-	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*normalToCamera, 1);
-	// output_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
+	// output_FragColor = vec4(vec3(0.5 + point_of_crossing*0.)*diffusion, 1);
+	// output_FragColor = vec4(vec3(1.*(0.5 + diffusion/2.0)), 1);
 
-	// output_FragColor = vec4(vec3(height)*normalToCamera, 1);
+	// output_FragColor = vec4(vec3(height)*diffusion, 1);
 	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb, 1);
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb, 1);
 	
 	
 	// output_FragColor = vec4(normalize(normals * v_TBN) /2. + 0.5, 1);
 	// output_FragColor = vec4((normals) /2. + 0.5, 1);
-	// output_FragColor = vec4(((normals * v_TBN) /2. + 0.5)*normalToCamera, 1);
+	// output_FragColor = vec4(((normals * v_TBN) /2. + 0.5)*diffusion, 1);
 	// output_FragColor = vec4(vec3((theta + phi)/5.), 1);
-	// output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*normalToCamera, 1);
-	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb*normalToCamera, 1);
-	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*normalToCamera, 1);
-	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
-	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*(0.5 + normalToCamera/2.0), 1);
+	// output_FragColor = vec4(texture(u_color_texture, texcoord).rgb*diffusion, 1);
+	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb*diffusion, 1);
+	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*diffusion, 1);
+	// output_FragColor = vec4(vec3(v_fColor * diffusion), 1);
+	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*(0.5 + diffusion/2.0), 1);
 	// output_FragColor = texture(u_normal_texture, texcoord);
-	output_FragColor = vec4(vec3(0.5, 0., 1.) * normalToCamera, 1.);
-	//vec3 basic = texture(u_normal_texture, texcoord).rgb*(0.5 + v_normalToCamera);
+	output_FragColor = vec4(vec3(0.5, 0., 1.) * diffusion, 1.);
+	//vec3 basic = texture(u_normal_texture, texcoord).rgb*(0.5 + v_diffusion);
 	// output_FragColor = vec4(basic.rgb + v_position.xyz, 1);
 	// output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 1.0)), 1);
     // output_FragColor = vec4(

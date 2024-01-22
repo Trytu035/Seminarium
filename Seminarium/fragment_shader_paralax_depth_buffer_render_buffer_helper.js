@@ -14,6 +14,6 @@ void main(){
     vec4 depthInfo = texture(u_height_map_texture, v_texcoord);
     float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256.;
 
-    gl_FragDepth = depthInfo_renderBuffer + texture(u_height_map_texture, v_texcoord).r * u_height_scale / (u_far_plane - u_near_plane);
+    gl_FragDepth = depthInfo_renderBuffer + depthInfo.r * u_height_scale / (u_far_plane - u_near_plane);
 }
 `

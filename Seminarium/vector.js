@@ -48,6 +48,20 @@ class Vector3 {
         this.y += other.y;
         this.z += other.z;
     }
+    scale(value) {
+        if (value.x === undefined) {
+            this.x *= value;
+            this.y *= value;
+            this.z *= value;
+        } else {
+            this.x *= value.x;
+            this.y *= value.y;
+            this.z *= value.z;
+        }
+    }
+    clone(){
+        return new Vector3(this.x, this.y, this.z);
+    }
     length() {
         return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z)
     }

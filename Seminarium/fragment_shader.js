@@ -19,21 +19,23 @@ uniform float u_near_plane;
 uniform float u_far_plane;
 uniform float u_height_scale;
 
-in float v_temp_use_the_oclussion;
+uniform int u_temp_use_the_oclussion;
 
 in vec4 v_fragment_position;
 in vec4 v_ndc;
+in vec3 v_light_direction;
 
 vec3 frag_position; //local
+vec3 backface_frag_position; //local
 
 uniform mat4 u_model_matrix;
 uniform mat4 u_camera_matrix;
-uniform mat4 u_view_matrix;
-uniform mat4 u_projection_matrix;
-uniform mat4 u_world_view_projection;
+// uniform mat4 u_view_matrix;
+// uniform mat4 u_projection_matrix;
+// uniform mat4 u_world_view_projection;
 uniform mat4 u_inverse_world_view_projection;
-uniform vec3 u_snow_direction;
-in mat4 v_world_inverse_transpose;
+// uniform vec3 u_snow_direction;
+// in mat4 v_world_inverse_transpose;
 struct depth_range_t {
     float near;
     float far;
@@ -67,8 +69,8 @@ void main(){
     vec2 texcoord = v_texcoord;
     vec2 texcoord_color = v_texcoord_color;
 
+    backface_frag_position = vec3(v_fragment_position);
     frag_position = vec3(v_fragment_position);
-    
     
     vec3 h_ndc = v_ndc.xyz / v_ndc.w;   //homogenous normalized deviece coordinates from -1 to 1 in every axis - clip position
     
@@ -120,11 +122,11 @@ void main(){
     // phi = atan((normals * TBN).y, (normals * TBN).x);
     // theta = atan(length((normals * TBN).xy), (normals * TBN).z);
     
-    // float normalToCamera = dot(normals, normalize(u_camera_matrix[2].xyz));
-    float normalToCamera = dot(normalize(normals), normalize(u_camera_matrix[2].xyz));
-    // float normalToCamera = dot(normals * TBN, vec3(0., 0., 1.));
+    // float diffusion = dot(normals, v_light_direction);
+    float diffusion = clamp(dot(normalize(normals), v_light_direction), 0., 1.);
+    // float diffusion = dot(normals * TBN, vec3(0., 0., 1.));
 
-	// output_FragColor = vec4(vec3(1.*(0.5 + normalToCamera/2.0)), 1);
+	// output_FragColor = vec4(vec3(1.*(0.5 + diffusion/2.0)), 1);
 
 	// output_FragColor = vec4(texture(u_height_map_texture, texcoord).rgb, 1);
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb, 1);
@@ -132,7 +134,7 @@ void main(){
 	// output_FragColor = vec4(normalize(normals * mat3(TBN[0], TBN[1], cross(TBN[0], TBN[1]) / length(TBN[0]))) /2. + 0.5, 1);
 	// output_FragColor = vec4(normalize(normals * mat3(3.*TBN[0], 3.*TBN[1], TBN[2])) /2. + 0.5, 1);
 	// output_FragColor = vec4(normalize(mat3(TBN[0], TBN[1], cross(TBN[0], TBN[1]) / length(TBN[0])) * -normals) /2. + 0.5, 1);
-	// if (v_temp_use_the_oclussion > 0.5) {
+	// if (u_temp_use_the_oclussion >= 1) {
 	//     output_FragColor = vec4(normalize(u_camera_matrix[2].xyz) /2. + 0.5, 1);
 	// } else {
 	//     output_FragColor = vec4(normalize(normals) /2. + 0.5, 1);
@@ -142,19 +144,45 @@ void main(){
 	// output_FragColor = vec4(normalize(normals) /2. + 0.5, 1);
     // output_FragColor = vec4((normals) /2. + 0.5, 1);
 	// output_FragColor = vec4((vec3(0., 0., 1.) * TBN) /2. + 0.5, 1);
-	// output_FragColor = vec4(((normals * TBN) /2. + 0.5)*normalToCamera, 1);
+	// output_FragColor = vec4(((normals * TBN) /2. + 0.5)*diffusion, 1);
 	// output_FragColor = vec4(vec3((theta + phi)/5.), 1);
-	output_FragColor = vec4(texture(u_color_texture, texcoord_color).rgb*normalToCamera, 1);
+	output_FragColor = vec4(texture(u_color_texture, texcoord_color).rgb * diffusion, 1);
+	
+	/*
+	float snow_thickness = length(v_fragment_position.xyz - world_view_direction / view_direction.z * u_height_scale - frag_position); //distance to ground
+	float snow_thickness2 = length(backface_frag_position - frag_position); // closest snow backface
+	float snow_light_absorbtion = 0.75;
+	float ground_light_absorbtion = 0.5;
+	vec3 halfway_vec = normalize(vec3(0., -1., 0) + normals * 0.0);
+	vec3 halfway_vec2 = normalize(-v_light_direction + normals * 0.0);
+	float Intensity = pow(clamp(dot(world_view_direction, -halfway_vec), 0., 1.), 1.0) * 1.;
+	float Intensity2 = pow(clamp(dot(world_view_direction, -halfway_vec2), 0., 1.), 1.0) * 1.;
+	// instead of diffusion, color before rendering this image
+	Intensity = (Intensity + 0.) * pow(1. - clamp(snow_thickness / 8., 0., 1.), 70.);
+	Intensity2 = snow_light_absorbtion * (Intensity2 + 0.00) * pow(1. - clamp(snow_thickness2 * 2., 0., 1.), 2.) * 0.1;
+	float IntensitySum = Intensity2;
+	for (int i = 0; i < 20; i++) {
+	    Intensity2 *= snow_light_absorbtion;
+	    IntensitySum += Intensity2;
+	}
+	vec3 result_color = texture(u_color_texture, texcoord_color).rgb;
+	//change backface color to color from backface.
+	// vec3 backface_color = vec3(0.5, 0., 1.);
+	vec3 backface_color = vec3(0.5, 0., 1.) * dot(TBN[2], v_light_direction);
+	
+	output_FragColor = vec4(mix(result_color*diffusion, ground_light_absorbtion * backface_color, clamp(Intensity, 0., 1.)) + 0.5 * IntensitySum * result_color, 1.);
+	// output_FragColor = vec4(result_color*diffusion, 1. - clamp(Intensity, 0., 1.));
+	*/
     // if (gl_FragCoord.z < 0.9993) {
-	//     output_FragColor = vec4(texture(u_color_texture, texcoord_color).rgb*normalToCamera, 1);
+	//     output_FragColor = vec4(texture(u_color_texture, texcoord_color).rgb*diffusion, 1);
 	// } else {
 	//     output_FragColor = vec4(1);
 	// }
 	// output_FragColor = vec4(texture(u_color_texture, texcoord_color).rgb, 1);
 	// output_FragColor = vec4(texture(u_height_map_texture, v_texcoord).rgb, 1);
 	// output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 500.)), 1);
-	// output_FragColor = vec4((texcoord.xyx).rgb*normalToCamera, 1);
-	// output_FragColor = vec4(vec3(v_fColor * normalToCamera), 1);
+	// output_FragColor = vec4((texcoord.xyx).rgb*diffusion, 1);
+	// output_FragColor = vec4(vec3(v_fColor * diffusion), 1);
 
 	//https://stackoverflow.com/questions/42633685/glsl-how-to-calculate-a-ray-direction-using-the-projection-matrix
 
@@ -256,16 +284,16 @@ vec4 ParallaxMapping(vec2 texCoords, vec3 viewDir, vec2 texCoords_color, vec3 vi
     // add binary search for relief mapping, based on - point 3 ↓↓↓
     // https://www.cs.purdue.edu/cgvlab/courses/434/434_Spring_2013/lectures/References/DepthImagesForRenderingSurfaceDetail.pdf
     
+    float reliefScale = 1.;
     for (int i = 0; i < binarySearchIterations; i++){
-        layerDepth /= 2.;
-        deltaTexCoords /= 2.;
+        reliefScale /= 2.;
         
         if (currentLayerDepth < currentDepthMapValue) {
-            currentTexCoords -= deltaTexCoords;
-            currentLayerDepth += layerDepth;
+            currentTexCoords -= deltaTexCoords * reliefScale;
+            currentLayerDepth += layerDepth * reliefScale;
         } else {
-            currentTexCoords += deltaTexCoords;
-            currentLayerDepth -= layerDepth;
+            currentTexCoords += deltaTexCoords * reliefScale;
+            currentLayerDepth -= layerDepth * reliefScale;
         }
         currentDepthMapValue = texture(depthMap, currentTexCoords).r;
     }
@@ -274,7 +302,31 @@ vec4 ParallaxMapping(vec2 texCoords, vec3 viewDir, vec2 texCoords_color, vec3 vi
     // currentTexCoords_color -= currentLayerDepth * viewDir_color.xy / viewDir_color.z * height_scale;
     currentTexCoords_color -= currentLayerDepth * viewDir_color.xy / viewDir.z * height_scale;
     frag_position -= currentLayerDepth * worldViewDir / viewDir.z * height_scale;
+    
+    vec2 backfaceCurrentTexCoords = currentTexCoords;
+    do {
+        // shift texture coordinates along direction of P
+        backfaceCurrentTexCoords -= deltaTexCoords;
+        // get depthmap value at current texture coordinates
+        currentDepthMapValue = texture(depthMap, backfaceCurrentTexCoords).r;  
+        // get depth of next layer
+        currentLayerDepth += layerDepth;  
+    } while(currentLayerDepth > currentDepthMapValue && currentLayerDepth < 1. && currentLayerDepth > 0.);
 
+    reliefScale = 1.;
+    for (int i = 0; i < binarySearchIterations; i++){
+        reliefScale /= 2.;
+
+        if (currentLayerDepth > currentDepthMapValue) {
+            backfaceCurrentTexCoords -= deltaTexCoords * reliefScale;
+            currentLayerDepth += layerDepth * reliefScale;
+        } else {
+            backfaceCurrentTexCoords += deltaTexCoords * reliefScale;
+            currentLayerDepth -= layerDepth * reliefScale;
+        }
+        currentDepthMapValue = texture(depthMap, backfaceCurrentTexCoords).r;
+    }
+    backface_frag_position -= clamp(currentLayerDepth, 0., 1.) * worldViewDir / viewDir.z * height_scale;
     // end of modifications
 
     return vec4(currentTexCoords, currentTexCoords_color);

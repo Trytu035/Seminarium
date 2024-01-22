@@ -1,4 +1,4 @@
-capsuleObj = `# Blender 3.3.1
+let capsuleObj = `# Blender 3.3.1
 # www.blender.org
 # mtllib capsule.mtl
 o Icosphere

@@ -976,11 +976,10 @@ function smoothNormals(vertices, texcoords, triangles_indices) {
     let vector = new Learn_webgl_vector3();
     let normal_indexes = [];
 
-    console.log(triangles_indices);
     for (let i2 = 0; i2 < triangles_indices.length; i2++) { //i2 repeat for each triangle //divide by 3 coordinates
         let numberTriangles = triangles_indices[i2].length - 2;
         if (numberTriangles > 1) {
-            console.log(numberTriangles);
+            console.log("This project supports only pretriangulated meshes. There may appear incorect lighting.");
         }
         let n = 1;
         while (n <= numberTriangles) {
@@ -1020,8 +1019,6 @@ function smoothNormals(vertices, texcoords, triangles_indices) {
                 all_bitangents.push(bitangent);
                 all_normals.push(normal);
             }
-            // normal_indexes.push(all_normals.length - 1)
-            // console.log(tangent + "\n" + bitangent + "\n" + normal + "\n");
             n += 1;
         }
     }

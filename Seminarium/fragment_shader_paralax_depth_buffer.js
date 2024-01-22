@@ -31,9 +31,6 @@ void main(){
     if (transformed_depth < 1.1) {   // check if agent is on the same level as snow
         output_FragColor = vec4(
             transformed_depth,  // only paralax height is updated - if something is not updated, change setting of colorMask
-            // transformed_depth,  // only paralax height is updated - if something is not updated, change setting of colorMask
-            // depthInfo.g, 
-            // depthInfo.b,
             0.0,
             0.0,
             1.0
