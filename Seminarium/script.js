@@ -1,3 +1,5 @@
+// noinspection JSSuspiciousNameCombination,TypeScriptUMDGlobal
+
 "use strict";
 const NEAR = 0.01;
 const FAR = 30.0;
@@ -15,7 +17,7 @@ function main() {
 
 let mouseUniformLocation;
 
-class World {
+/*class World {
     constructor() {
         this.camera();
     }
@@ -25,12 +27,12 @@ class Camera {
         this.fov = 90;
         this.type; // perspective or orthogonal
         this.camera_matrix = camera_matrix;
-        this.view_matrix;
+        this.view_matrix = math.inv(camera_matrix);
         this.projection_matrix;
         // xyzw - 1/w component controls size of orthogonal camera y
         //        x component * ratio y/x = orthogonal camera x
     }
-}
+}*/
 
 let temporaryLocation_1;
 
@@ -44,13 +46,13 @@ function degToRad(value) {
 let startTime = Date.now();
 let images = [];
 
-let material1;  //paralax snow
-let materialLambertian;  //paralax snow
-let materialDepth;  //paralax snow
+let material1;  // parallax snow
+let materialLambertian;  // parallax snow
+let materialDepth;  // parallax snow
 let materialDepthHelper;
-let materialDepthRenderBuffer;  //image post processing effect
-let materialGenerateNormals;    //image post processing effect
-let materialAddOne;             //image post processing effect
+let materialDepthRenderBuffer;  // image post processing effect
+let materialGenerateNormals;    // image post processing effect
+let materialAddOne;             // image post processing effect
 
 let modelFullScreenNormals;
 let modelFullScreenRenderBuffer;
@@ -175,7 +177,7 @@ function init(canvas, gl) {
 
     mouseUniformLocation = gl.getUniformLocation(material1.program, "u_mouse");
     // normalDetailTextureLocation = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
-    temporaryLocation_1 = gl.getUniformLocation(material1.program, "u_temp_use_the_oclussion");
+    temporaryLocation_1 = gl.getUniformLocation(material1.program, "u_temp_use_the_occlusion");
 
     canvas.width = window.innerWidth / resolution;
     canvas.height = window.innerHeight / resolution;
@@ -305,7 +307,7 @@ function loop(canvas, gl){
     gl.useProgram(material1.program);
     gl.uniform1i(temporaryLocation_1, parseFloat(mouseState[0]));
     gl.uniform1f(material1.location.uniform.height_scale, snow_height_scale);
-    if (previous_height_scale !== snow_height_scale){    //refresshes render buffer - TODO: refresh render buffer, but make paralax look the same after changing height_scale
+    if (previous_height_scale !== snow_height_scale){    // refreshes render buffer - TODO: refresh render buffer, but make parallax look the same after changing height_scale
         previous_height_scale = snow_height_scale;
         snow_offset = new Vector3(...(math.transpose(snow_camera_matrix).valueOf()[2].slice(0, 3)));
         snow_offset.scale(snow_height_scale - 0.01);
@@ -464,12 +466,12 @@ function loop(canvas, gl){
     gl.bindTexture(gl.TEXTURE_2D, model1InDepthTransform.textures["height_transform_framebuffer"].texture)
     gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
 
-    gl.depthFunc(gl.GREATER);   //we want to find the deepest intersection with snow plane
-    gl.disable(gl.CULL_FACE);   //back-face could intersect with snow plane
-    // gl.disable(gl.BLEND);       //program uses alpha channel to send data - not for now
+    gl.depthFunc(gl.GREATER);   // we want to find the deepest intersection with snow plane
+    gl.disable(gl.CULL_FACE);   // back-face could intersect with snow plane
+    // gl.disable(gl.BLEND);       // program uses alpha channel to send data - not for now
 
     // using heightTransformFB draw agents in depth shader to heightMapFB
-    gl.colorMask(true, false, false, false);    //only paralax height is updated - change if geometry has moved
+    gl.colorMask(true, false, false, false);    // only parallax height is updated - change if geometry has moved
     [
         model2InDepth,
         model3InDepth,
@@ -487,13 +489,13 @@ function loop(canvas, gl){
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.BLEND);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, normalFrameBuffer);  //generate normals
+    gl.bindFramebuffer(gl.FRAMEBUFFER, normalFrameBuffer);  // generate normals
     setTexture(gl, model1.textures["height_map_framebuffer"], gl.TEXTURE1);
-    // gl.viewport(0, 0, textureSize, textureSize); //unnecessary - same sized texture
-    gl.useProgram(materialGenerateNormals.program); //draw normals as post processing effect
+    // gl.viewport(0, 0, textureSize, textureSize); // unnecessary - same sized texture
+    gl.useProgram(materialGenerateNormals.program); // draw normals as post processing effect
     gl.bindVertexArray(modelFullScreenNormals.VAO);
-    gl.uniform1f(materialGenerateNormals.location.uniform.slopeStrenth, textureSize / 7. * snow_height_scale); //good aproximation of slope (picked by eye)
-    gl.drawArrays(gl.TRIANGLES, 0, 6);   // 2 coordinates per vertex
+    gl.uniform1f(materialGenerateNormals.location.uniform.slopeStrenth, textureSize / 7. * snow_height_scale); // good approximation of slope (picked by eye)
+    gl.drawArrays(gl.TRIANGLES, 0, 6);   // two coordinates per vertex
 
     gl.useProgram(material1.program);
     gl.uniform3f(material1.location.uniform.snowDirection,
@@ -557,40 +559,40 @@ function changeTexture(gl, textureLocation, id) {
     gl.uniform1i(textureLocation, gl.TEXTURE0 - id - 1);
 }
 
-var resolution = 1;	//rozdzielczoœæ canvas na którym jest wyœwietlany obraz
-//poni¿sze zmienne s³u¿¹ do obs³ugi zdarzeñ
-var mouseX = 0;
-var mouseY = 0;
-var clickX = 0;
-var clickY = 0;
-// var rotateX = degToRad(0);
-// var rotateY = degToRad(0);
-var rotateX = 0.59;
-var rotateY = -0.55;
-var rotateZ = degToRad(0);
-var zoom = 3;
-var oldRotateX = rotateX;
-var oldRotateY = rotateY;
-var mouseState = [0, 0];
-var _keysInternalState = [];
-var keysPressed = [];
-var cameraVector = [0, 0, 0];
+let resolution = 1;	// resolution of canvas on which the image is rendered
+// variables below are for event handling
+let mouseX = 0;
+let mouseY = 0;
+let clickX = 0;
+let clickY = 0;
+// let rotateX = degToRad(0);
+// let rotateY = degToRad(0);
+let rotateX = 0.59;
+let rotateY = -0.55;
+let rotateZ = degToRad(0);
+let zoom = 3;
+let oldRotateX = rotateX;
+let oldRotateY = rotateY;
+let mouseState = [0, 0];
+let _keysInternalState = [];
+let keysPressed = [];
+let cameraVector = [0, 0, 0];
 
 // z is smaller -> z is closer
 
 document.getElementById("canvas").addEventListener("mousedown", function (e) {
 let canvas = document.getElementById("canvas");
-if (e.which == 1) {
+if (e.which === 1) {
     mouseState[0] = 1;
     clickX = (e.clientX / canvas.width * 2 / 3 - 1) / resolution * 5;
     clickY = (-e.clientY / canvas.height * 2 / 3 + 1) / resolution * 5;
-} else if (e.which == 3) {
+} else if (e.which === 3) {
     mouseState[1] = 1;
 }
 });
 document.getElementById("canvas").addEventListener("mousemove", function (e) {
 let canvas = document.getElementById("canvas");
-if (mouseState[0] == 1) {
+if (mouseState[0] === 1) {
     mouseX = (e.clientX / canvas.width * 2 / 3 - 1) / resolution * 5;
     mouseY = (-e.clientY / canvas.height * 2 / 3 + 1) / resolution * 5;
     rotateX = (clickX - mouseX + oldRotateX);
@@ -598,11 +600,11 @@ if (mouseState[0] == 1) {
 }
 });
 document.getElementById("canvas").addEventListener("mouseup", function (e) {
-if (e.which == 1) {
+if (e.which === 1) {
     mouseState[0] = 0;
     oldRotateX = rotateX
     oldRotateY = rotateY
-} else if (e.which == 3) {
+} else if (e.which === 3) {
     mouseState[1] = 0;
 }
 });
@@ -632,7 +634,7 @@ window.addEventListener("keyup", function (e) {
         i = _keysInternalState.indexOf(e.keyCode);
     }
 })
-window.addEventListener("blur", function (e) {  //handles window out of focus (Tab and Alt)
+window.addEventListener("blur", function () {  //handles window out of focus (Tab and Alt)
     keysPressed.splice(0, keysPressed.length);
     _keysInternalState.splice(0, _keysInternalState.length);
 })

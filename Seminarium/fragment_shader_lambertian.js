@@ -14,7 +14,7 @@ in vec4 v_fColor;
 uniform float u_near_plane;
 uniform float u_far_plane;
 
-// uniform int u_temp_use_the_oclussion;
+// uniform int u_temp_use_the_occlusion;
 
 in vec3 v_fragment_position;
 in vec3 v_light_direction;

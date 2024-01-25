@@ -29,7 +29,7 @@ precision highp float;
 	out vec4 v_ndc;
 	out vec3 v_light_direction;
 	
-	uniform int u_temp_use_the_oclussion;  //sometimes useful
+	uniform int u_temp_use_the_occlusion;  //sometimes useful
 	uniform vec3 u_snow_direction;
     
 	void main(){

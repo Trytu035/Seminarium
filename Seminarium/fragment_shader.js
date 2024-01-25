@@ -21,7 +21,7 @@ uniform float u_near_plane;
 uniform float u_far_plane;
 uniform float u_height_scale;
 
-uniform int u_temp_use_the_oclussion;
+uniform int u_temp_use_the_occlusion;
 
 in vec4 v_fragment_position;
 in vec4 v_ndc;
@@ -143,7 +143,7 @@ void main(){
 	// output_FragColor = vec4(normalize(normals * mat3(TBN[0], TBN[1], cross(TBN[0], TBN[1]) / length(TBN[0]))) /2. + 0.5, 1);
 	// output_FragColor = vec4(normalize(normals * mat3(3.*TBN[0], 3.*TBN[1], TBN[2])) /2. + 0.5, 1);
 	// output_FragColor = vec4(normalize(mat3(TBN[0], TBN[1], cross(TBN[0], TBN[1]) / length(TBN[0])) * -normals) /2. + 0.5, 1);
-	// if (u_temp_use_the_oclussion >= 1) {
+	// if (u_temp_use_the_occlusion >= 1) {
 	//     output_FragColor = vec4(normalize(u_camera_matrix[2].xyz) /2. + 0.5, 1);
 	// } else {
 	//     output_FragColor = vec4(normalize(normals) /2. + 0.5, 1);

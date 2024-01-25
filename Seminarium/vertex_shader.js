@@ -23,7 +23,7 @@ precision highp float;
 	out vec4 v_ndc;
 	out vec3 v_light_direction;
 	
-	uniform int u_temp_use_the_oclussion;  //sometimes useful
+	uniform int u_temp_use_the_occlusion;  //sometimes useful
     
 	void main(){
 	//https://www.youtube.com/watch?time_continue=269&v=EpADhkiJkJA&embeds_referring_euri=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dparalax%2Bmapping%2Bimplementation%2Bopengl%26sca_esv%3D576631001%26sxsrf%3DAM9HkKmHyi5MKpR1r8D8c_UJGQn5A5YVxA&source_ve_path=MTM5MTE3LDEzOTExNywyODY2Ng&feature=emb_logo&ab_channel=thebennybox

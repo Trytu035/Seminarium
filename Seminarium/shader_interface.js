@@ -1,3 +1,5 @@
+// noinspection TypeScriptUMDGlobal,JSUnresolvedFunction
+
 class Model {
     constructor(material) {
         this.material = material;
@@ -324,7 +326,7 @@ class Model {
 
     }
 
-    generateFace(position, tangent, bitangent, size_x, size_y, scale=1, swap_xy = 0, invert_normal = 0) {
+    generateFace(position, tangent, bitangent, size_x, size_y, scale=1, swap_xy = 0) {
         tangent.normalize();
         bitangent.normalize();
         size_x /= 2;
@@ -547,11 +549,13 @@ function createShader(gl, sourceCode, type) {
 }
 
 function createProgram(gl, vertexShader, fragmentShader) {
-    var program = gl.createProgram();
+    let program = gl.createProgram();
+
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
-    var success = gl.getProgramParameter(program, gl.LINK_STATUS);
+
+    let success = gl.getProgramParameter(program, gl.LINK_STATUS);
     if (success) {
         return program;
     }
@@ -613,7 +617,7 @@ function addTexture(model, name, image, id, textureLocation, internalFormat, for
         gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, format, gl.UNSIGNED_BYTE, image);
     }
 
-    if (internalFormat != gl.RGBA16F && internalFormat != gl.RGBA16UI) {
+    if (internalFormat !== gl.RGBA16F && internalFormat !== gl.RGBA16UI) {
         gl.generateMipmap(gl.TEXTURE_2D);
     }
     model.textures[name] = { texture: texture, id: id, location: textureLocation };
