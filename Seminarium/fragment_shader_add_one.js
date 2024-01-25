@@ -11,7 +11,7 @@ out vec4 output_FragColor;
 // adds one to paralax (changes paralax), so depth buffer must be overwritten.
 void main(){
     vec4 depthInfo = texture(u_height_map_texture, v_texcoord);
-    float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256.;
+    float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256. - 0.25 / 256.;
 
     gl_FragDepth = depthInfo_renderBuffer + (depthInfo.r - 1. / 256.) * u_height_scale / (u_far_plane - u_near_plane);
     

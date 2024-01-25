@@ -40,72 +40,8 @@ function radToDeg(value) {
 function degToRad(value) {
     return value / 180 * Math.PI;
 }
-//tangent - red X   -left/right
-//bitangent - green Y   -down/up
-//normal - blue Z
-function generateFace(model, position, tangent, bitangent, size_x, size_y, scale=1, swap_xy = 0, invert_normal = 0) {
-    tangent.normalize();
-    bitangent.normalize();
-    size_x /= 2;
-    size_y /= 2;
 
-    let P1 = new Vector3(
-        position.x - tangent.x*size_x + bitangent.x*size_y,
-        position.y - tangent.y*size_x + bitangent.y*size_y,
-        position.z - tangent.z*size_x + bitangent.z*size_y,
-    );
-    let P2 = new Vector3(
-        position.x - tangent.x*size_x - bitangent.x*size_y,
-        position.y - tangent.y*size_x - bitangent.y*size_y,
-        position.z - tangent.z*size_x - bitangent.z*size_y,
-    );
-    let P3 = new Vector3(
-        position.x + tangent.x*size_x - bitangent.x*size_y,
-        position.y + tangent.y*size_x - bitangent.y*size_y,
-        position.z + tangent.z*size_x - bitangent.z*size_y,
-    );
-    let P4 = new Vector3(
-        position.x + tangent.x*size_x + bitangent.x*size_y,
-        position.y + tangent.y*size_x + bitangent.y*size_y,
-        position.z + tangent.z*size_x + bitangent.z*size_y,
-    );
-    model.positions.push(...P1.toArray());
-    model.positions.push(...P2.toArray());
-    model.positions.push(...P3.toArray());
-    model.positions.push(...P1.toArray());
-    model.positions.push(...P3.toArray());
-    model.positions.push(...P4.toArray());
-    size_x *= 2;    //space from -tangent to +tangent is 2*tangent, so texcoord needs to be multiplied to make it height-consistent
-    size_y *= 2;
-    if (swap_xy) {
-        model.texcoords.push(
-            size_y * scale, 0      * scale,
-            0      * scale, 0      * scale,
-            0      * scale, size_x * scale,
-            size_y * scale, 0      * scale,
-            0      * scale, size_x * scale,
-            size_y * scale, size_x * scale,
-        );
-    } else {
-        model.texcoords.push(
-            0      * scale, size_y * scale,
-            0      * scale, 0      * scale,
-            size_x * scale, 0      * scale,
-            0      * scale, size_y * scale,
-            size_x * scale, 0      * scale,
-            size_x * scale, size_y * scale,
-        );
-        // model.texcoords.push(
-        //     -size_x* scale, size_y * scale,
-        //     -size_x* scale, -size_y* scale,
-        //     size_x * scale, -size_y* scale,
-        //     -size_x* scale, size_y * scale,
-        //     size_x * scale, -size_y* scale,
-        //     size_x * scale, size_y * scale,
-        // );
-    }
-}
-
+let startTime = Date.now();
 let images = [];
 
 let material1;  //paralax snow
@@ -138,6 +74,7 @@ let snow_camera_matrix;
 let snow_projection_matrix;
 let snow_view_matrix;
 let snow_view_projection;
+let snow_offset;
 let previous_height_scale = snow_height_scale;  //check if snow_height_scale has changed
 
 let heightMapFrameBuffer;
@@ -158,8 +95,8 @@ function init(canvas, gl) {
     model1 = new Model(material1);
     model1Lambertian = new Model(materialLambertian);
     model1InDepthTransform = new Model(materialDepthHelper);
-    // model1.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0])
-    // model1.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[0])
+    // model1Lambertian.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0])
+    // model1Lambertian.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[0])
     model1Lambertian.generateExampleModel();
 
     model2 = new Model(materialLambertian);
@@ -186,27 +123,35 @@ function init(canvas, gl) {
     snow_projection_plane.center = new Vector3(0, 6, 0);
     // snow_projection_plane.center = new Vector3(0, 0, 4);
     // snow_projection_plane.center = new Vector3(0, 0, -4);
-    generateFace(
-        snow_projection_plane, snow_projection_plane.center,
+    snow_projection_plane.generateFace(snow_projection_plane.center,
         new Vector3(1, 0, 0), new Vector3(0, -0.00, 1),
         // new Vector3(1, 1, 0), new Vector3(1, -1, -1),
         // new Vector3(1, 1, 0), new Vector3(-1, 1, 1),
         7, 7, 1
     );
+    snow_projection_plane.computeNormals();
+    snow_camera_matrix = math.identity(4);
+    snow_camera_matrix = math.multiply(math.matrixFromColumns(
+        [snow_projection_plane.tangents[0], snow_projection_plane.tangents[1], snow_projection_plane.tangents[2], 0],
+        [-snow_projection_plane.bitangents[0], -snow_projection_plane.bitangents[1], -snow_projection_plane.bitangents[2], 0],
+        [-snow_projection_plane.normals[0], -snow_projection_plane.normals[1], -snow_projection_plane.normals[2], 0],
+        // [snow_projection_plane.center.toArray(), 1].flat(),
+        [snow_projection_plane.center.x, snow_projection_plane.center.y, snow_projection_plane.center.z, 1],
+    ), snow_camera_matrix);
 
     {
-        generateFace(
-            model2, new Vector3(0, 3.1, 0),
+        model2.generateFace(
+            new Vector3(0, 3.1, 0),
             new Vector3(1, 0, 0), new Vector3(0, 0, -1),
             3, 3, 4
         );
-        generateFace(
-            model2, new Vector3(0, 0.5, 0.4),
+        model2.generateFace(
+            new Vector3(0, 0.5, 1.1),
             new Vector3(1, 0, 0), new Vector3(0, 1, 0),
             0.5, 0.5, 1
         );
-        generateFace(
-            model3, new Vector3(0, -1.1, 3.),
+        model3.generateFace(
+            new Vector3(0, -1.1, 3.),
             new Vector3(1, 0, 0), new Vector3(0, 0, -1),
             2.5, 2.5, 1
         );
@@ -216,16 +161,17 @@ function init(canvas, gl) {
     model2.computeNormals();
     model2InDepth.copyModel(model2);
 
-    model1Lambertian.translate(0, -2, 0);
     // model1.translate(0, -0.5, 2);
-    // model1.scale(10, 2, 10);
-    // model1.rotate(0.2, -0.5, 0.1);
-    model1Lambertian.applyTransformMatrix();
+    // model1Lambertian.scale(2, 0.6, 3);
+    // model1Lambertian.rotate(0.2, -0.5, 0.1);
+    // model1Lambertian.applyTransformMatrix();    // rotate, scale and skew has to be applied for lighting to be correct. The only exception is translation which don't have to be applied.
+    model1Lambertian.translate(0, -1.5, 0);
     model1Lambertian.computeNormals(true);
-    model1.copyModel(model1Lambertian, false);
+    model1.copyModel(model1Lambertian, false);  // create snow model
     model1InDepthTransform.copyModel(model1);
-    model1.translate(0, snow_height_scale - 0.01, 0);
-    snow_projection_plane.computeNormals();
+    snow_offset = new Vector3(...(math.transpose(snow_camera_matrix).valueOf()[2].slice(0, 3)));
+    snow_offset.scale(snow_height_scale - 0.01);
+    model1.translate(...(snow_offset.toArray()));
 
     mouseUniformLocation = gl.getUniformLocation(material1.program, "u_mouse");
     // normalDetailTextureLocation = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
@@ -241,14 +187,6 @@ function init(canvas, gl) {
     // gl.enable(gl.BLEND);
     // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    snow_camera_matrix = math.identity(4);
-    snow_camera_matrix = math.multiply(math.matrixFromColumns(
-        [snow_projection_plane.tangents[0], snow_projection_plane.tangents[1], snow_projection_plane.tangents[2], 0],
-        [-snow_projection_plane.bitangents[0], -snow_projection_plane.bitangents[1], -snow_projection_plane.bitangents[2], 0],
-        [-snow_projection_plane.normals[0], -snow_projection_plane.normals[1], -snow_projection_plane.normals[2], 0],
-        // [snow_projection_plane.center.toArray(), 1].flat(),
-        [snow_projection_plane.center.x, snow_projection_plane.center.y, snow_projection_plane.center.z, 1],
-    ), snow_camera_matrix);
     // snow_projection_matrix = orthographic_mtx(-4, 4, -4, 4, NEAR, FAR);
     snow_projection_matrix = orthographic_mtx(-8, 8, -8, 8, NEAR, FAR);
     snow_view_matrix = math.inv(snow_camera_matrix);
@@ -369,9 +307,14 @@ function loop(canvas, gl){
     gl.uniform1f(material1.location.uniform.height_scale, snow_height_scale);
     if (previous_height_scale !== snow_height_scale){    //refresshes render buffer - TODO: refresh render buffer, but make paralax look the same after changing height_scale
         previous_height_scale = snow_height_scale;
-        model1.translate(0., -model1.getTranslation()[1], 0);
-        model1.translate(0., model1InDepthTransform.getTranslation()[1], 0);
-        model1.translate(0, snow_height_scale - 0.01, 0);   // snow is placed height_scale distance from the ground
+        snow_offset = new Vector3(...(math.transpose(snow_camera_matrix).valueOf()[2].slice(0, 3)));
+        snow_offset.scale(snow_height_scale - 0.01);
+        console.log(model1InDepthTransform.getTranslation())
+        console.log(model1.getTranslation())
+        model1.translate(...math.multiply(model1.getTranslation(), -1).valueOf());
+        model1.translate(...(model1InDepthTransform.getTranslation().valueOf()));
+        model1.translate(...(model1Lambertian.getTranslation().valueOf()));
+        model1.translate(...(snow_offset.toArray()));   // snow is placed height_scale distance from the ground
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
         gl.viewport(0, 0, textureSize, textureSize);
@@ -446,13 +389,13 @@ function loop(canvas, gl){
     modelBootRight.rotate(Date.now() / 400, 0, 0);
     modelBootLeft.translate(...bootDistanceLeft.toArray());
     modelBootRight.translate(...bootDistanceRight.toArray());
-    modelBootLeft.translate(0., boot_height - 2 + model1Lambertian.getTranslation()[1], 0.);
-    modelBootRight.translate(0., boot_height - 2 + model1Lambertian.getTranslation()[1], 0.);
+    modelBootLeft.translate(0., boot_height + model1Lambertian.getTranslation()[1], 0.);
+    modelBootRight.translate(0., boot_height + model1Lambertian.getTranslation()[1], 0.);
     modelCapsule.translate(...capsuleDistance.toArray());
-    modelCapsule.translate(0, -1.5, 0);
-    modelCapsule.rotate(0, -Date.now() / 2000, 0);
-    modelBootLeft.rotate(0, -Date.now() / 2000, 0);
-    modelBootRight.rotate(0, -Date.now() / 2000, 0);
+    modelCapsule.translate(0, -1., 0);
+    modelCapsule.rotate(0, (startTime - Date.now()) / 2000, 0);
+    modelBootLeft.rotate(0, (startTime - Date.now()) / 2000, 0);
+    modelBootRight.rotate(0, (startTime - Date.now()) / 2000, 0);
 
     let camera_matrix = math.identity(4);
     camera_matrix = math.multiply(translate_mtx(0, 0, zoom), camera_matrix);
@@ -585,12 +528,12 @@ function loop(canvas, gl){
 
 function initModel(gl, model, view_projection, camera_matrix, projection_matrix, near, far) {
     let world_view_projection = math.multiply(view_projection, model.model_matrix);
-    let inverse_world_view_projection = math.inv(world_view_projection);
+    let inverse_view_projection = math.inv(view_projection);
 
     gl.useProgram(model.material.program);
     gl.bindVertexArray(model.VAO);
     gl.uniformMatrix4fv(model.material.location.uniform.mvp, true, math.flatten(world_view_projection).valueOf());
-    gl.uniformMatrix4fv(model.material.location.uniform.inv_mvp, true, math.flatten(inverse_world_view_projection).valueOf());
+    gl.uniformMatrix4fv(model.material.location.uniform.inv_view_projection, true, math.flatten(inverse_view_projection).valueOf());
     gl.uniformMatrix4fv(model.material.location.uniform.world_inv_transpose, false, math.flatten(math.inv(model.model_matrix)).valueOf());
     gl.uniformMatrix4fv(model.material.location.uniform.camera, true, math.flatten(camera_matrix).valueOf());
     gl.uniformMatrix4fv(model.material.location.uniform.projection, true, math.flatten(projection_matrix).valueOf());

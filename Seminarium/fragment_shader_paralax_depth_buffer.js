@@ -22,7 +22,7 @@ void main(){
     // float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256. + depthInfo.a / 256. / 256.;
     	
     vec4 depthInfo = texture(u_height_map_texture, h_ndc.xy / 2. + 0.5);
-    float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256. - 1. / float(2 << 10);   // small bias
+    float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256. - 0.25 / 256.;
     
     gl_FragDepth = gl_FragCoord.z;
     

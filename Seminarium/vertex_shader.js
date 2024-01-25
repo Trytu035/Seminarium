@@ -27,10 +27,10 @@ precision highp float;
     
 	void main(){
 	//https://www.youtube.com/watch?time_continue=269&v=EpADhkiJkJA&embeds_referring_euri=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dparalax%2Bmapping%2Bimplementation%2Bopengl%26sca_esv%3D576631001%26sxsrf%3DAM9HkKmHyi5MKpR1r8D8c_UJGQn5A5YVxA&source_ve_path=MTM5MTE3LDEzOTExNywyODY2Ng&feature=emb_logo&ab_channel=thebennybox
-		vec3 t = (mat3(u_world_inverse_transpose) * a_tangents);
-		vec3 b = (mat3(u_world_inverse_transpose) * a_bitangents);
-		// vec3 n = (mat3(u_world_inverse_transpose) * a_normals) / sqrt(length(cross(t, b)));	//dlaczego sqrt??
-		vec3 n = (mat3(u_world_inverse_transpose) * a_normals);	//dlaczego sqrt??
+		vec3 t = normalize(mat3(u_model_matrix) * a_tangents);
+		vec3 b = normalize(mat3(u_model_matrix) * a_bitangents);
+		// vec3 n = normalize(mat3(u_world_inverse_transpose) * a_normals) / sqrt(length(cross(t, b)));	//dlaczego sqrt??
+		vec3 n = normalize(mat3(u_world_inverse_transpose) * a_normals);	//dlaczego sqrt??
 
 		v_TBN = mat3(t, b, n);
 		v_TBN = inverse(transpose(v_TBN));

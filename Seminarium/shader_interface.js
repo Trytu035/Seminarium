@@ -17,6 +17,9 @@ class Model {
 // u3, v3
 // u4, v4
         this.texcoords = [];
+// tangent   - red   X   - left / right
+// bitangent - green Y   - down / up
+// normal    - blue  Z   - near / far
         this.tangents = [];
         this.bitangents = [];
         this.normals = [];
@@ -191,40 +194,10 @@ class Model {
         gl.vertexAttribPointer(this.material.location.attribute.normal, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
     }
 
-    applyTransformMatrix() {    // If this function is going to be used, you can use copyModel only after this function is applied.
-        for (let i = 0; i < this.positions.length / 3; i++){
-            let transformedPosition = math.multiply(
-                this.model_matrix,
-                math.matrix([this.positions[i*3], this.positions[i*3+1], this.positions[i*3+2], 1])
-            )
-            this.positions[i*3] = transformedPosition.get([0]);
-            this.positions[i*3 + 1] = transformedPosition.get([1]);
-            this.positions[i*3 + 2] = transformedPosition.get([2]);
-        }
-        if (this.model_object !== undefined && this.model_object !== null) {
-            for (let i = 1; i < this.model_object.all_vertices.length; i++) {
-                let transformedPosition = math.multiply(
-                    this.model_matrix,
-                    math.matrix([
-                        this.model_object.all_vertices[i][0],
-                        this.model_object.all_vertices[i][1],
-                        this.model_object.all_vertices[i][2],
-                        1
-                    ])
-                )
-                if (this.model_object) {
-                    this.model_object.all_vertices[i][0] = transformedPosition.get([0]);
-                    this.model_object.all_vertices[i][1] = transformedPosition.get([1]);
-                    this.model_object.all_vertices[i][2] = transformedPosition.get([2]);
-                }
-            }
-        }
-        this.model_matrix = math.identity(4);
-    }
-
     copyModel(other, trace) {   //copies data from other model to this model (should be used after flat normals are computed), or computeNormals would need to be called afterwards)
         let gl = this.material.gl;
         this.model_matrix = other.model_matrix;
+        this.model_object = other.model_object;
         this.positions = other.positions;
         this.texcoords = other.texcoords;
         this.normals = other.normals;
@@ -532,7 +505,7 @@ class Material {
             },
             uniform: {
                 mvp: this.gl.getUniformLocation(this.program, "u_world_view_projection"),
-                inv_mvp: this.gl.getUniformLocation(this.program, "u_inverse_world_view_projection"),
+                inv_view_projection: this.gl.getUniformLocation(this.program, "u_inverse_view_projection"),
                 world_inv_transpose: this.gl.getUniformLocation(this.program, "u_world_inverse_transpose"),
                 model: this.gl.getUniformLocation(this.program, "u_model_matrix"),
                 camera: this.gl.getUniformLocation(this.program, "u_camera_matrix"),

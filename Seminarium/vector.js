@@ -47,6 +47,7 @@ class Vector3 {
         this.x += other.x;
         this.y += other.y;
         this.z += other.z;
+        return this;
     }
     scale(value) {
         if (value.x === undefined) {
@@ -58,6 +59,7 @@ class Vector3 {
             this.y *= value.y;
             this.z *= value.z;
         }
+        return this;
     }
     clone(){
         return new Vector3(this.x, this.y, this.z);

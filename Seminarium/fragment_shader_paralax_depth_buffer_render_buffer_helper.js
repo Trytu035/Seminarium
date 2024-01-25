@@ -12,7 +12,7 @@ uniform float u_height_scale;
 // this step has to be made in different draw cycle than fragment_shader_paralax_depth_buffer_helper
 void main(){
     vec4 depthInfo = texture(u_height_map_texture, v_texcoord);
-    float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256.;
+    float depthInfo_renderBuffer = depthInfo.g + depthInfo.b / 256. - 0.25 / 256.;
 
     gl_FragDepth = depthInfo_renderBuffer + depthInfo.r * u_height_scale / (u_far_plane - u_near_plane);
 }

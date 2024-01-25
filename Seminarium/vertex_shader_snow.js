@@ -33,18 +33,21 @@ precision highp float;
 	uniform vec3 u_snow_direction;
     
 	void main(){
-	//https://www.youtube.com/watch?time_continue=269&v=EpADhkiJkJA&embeds_referring_euri=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dparalax%2Bmapping%2Bimplementation%2Bopengl%26sca_esv%3D576631001%26sxsrf%3DAM9HkKmHyi5MKpR1r8D8c_UJGQn5A5YVxA&source_ve_path=MTM5MTE3LDEzOTExNywyODY2Ng&feature=emb_logo&ab_channel=thebennybox
-		vec3 t = (mat3(u_world_inverse_transpose) * a_tangents);
-		vec3 b = (mat3(u_world_inverse_transpose) * a_bitangents);
-		// vec3 n = (mat3(u_world_inverse_transpose) * a_normals) / sqrt(length(cross(t, b)));	//dlaczego sqrt??
-		vec3 n = (mat3(u_world_inverse_transpose) * a_normals);
-		vec3 t_color = (mat3(u_world_inverse_transpose) * a_tangents_color);
-		vec3 b_color = (mat3(u_world_inverse_transpose) * a_bitangents_color);
-		// vec3 n_color = (mat3(u_world_inverse_transpose) * a_normals_color) / sqrt(length(cross(t_color, b_color)));	//dlaczego sqrt??
-		vec3 n_color = (mat3(u_world_inverse_transpose) * a_normals_color);
+		//normally you would use model inverse transpose instead of model matrix, but the last step involves inverse transposing the TBN matrix, so you shouldn't do it second time
+		// the statement above is true for wrong reasons. (see fragment_lambertian and vertex_shader) - maybe it's because of normals - some source said that model_inverse_transpose math works only for normals.
+		vec3 t = 			(mat3(u_model_matrix) * a_tangents);
+		vec3 b = 			(mat3(u_model_matrix) * a_bitangents);
+		// vec3 n = 		(mat3(u_world_inverse_transpose) * a_normals) / sqrt(length(cross(t, b)));	//dlaczego sqrt??
+		// vec3 n = 		(mat3(u_world_inverse_transpose) * a_normals);
+		vec3 t_color = 		(mat3(u_model_matrix) * a_tangents_color);
+		vec3 b_color = 		(mat3(u_model_matrix) * a_bitangents_color);
+		// vec3 n_color = 	(mat3(u_world_inverse_transpose) * a_normals_color) / sqrt(length(cross(t_color, b_color)));	//dlaczego sqrt??
+		// vec3 n_color = 	(mat3(u_world_inverse_transpose) * a_normals_color);
 
 		v_TBN = mat3(t, b, u_snow_direction);	//set paralax to point at snow plane direction
 		v_TBN_color = mat3(t_color, b_color, u_snow_direction);	//if projected from normal paralax bends in oneself - 
+
+		// https://paroj.github.io/gltut/Illumination/Tut09%20Normal%20Transformation.html 
 		v_TBN = inverse(transpose(v_TBN));				//for not normalized TBN use inverse(transpose(TBN))
 		v_TBN_color = inverse(transpose(v_TBN_color));	//for not normalized TBN use inverse(transpose(TBN))
 
