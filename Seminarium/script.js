@@ -3,9 +3,10 @@
 "use strict";
 const NEAR = 0.01;
 const FAR = 30.0;
+// const textureSize = 2048;
 const textureSize = 1024;
 // const textureSize = 256;
-let snow_height_scale = 0.7;
+let snow_height_scale = 1.2;
 
 function main() {
     /** @type {HTMLCanvasElement} */
@@ -46,10 +47,10 @@ function degToRad(value) {
 let startTime = Date.now();
 let images = [];
 
-let material1;  // parallax snow
-let materialLambertian;  // parallax snow
-let materialDepth;  // parallax snow
-let materialDepthHelper;
+let materialSnow;               // parallax snow
+let materialLambertian;         // for rough surface without speculars
+let materialDepth;              // depth buffer
+let materialSnowDepthInit;      // overwrites depth
 let materialDepthRenderBuffer;  // image post processing effect
 let materialGenerateNormals;    // image post processing effect
 let materialAddOne;             // image post processing effect
@@ -57,21 +58,24 @@ let materialAddOne;             // image post processing effect
 let modelFullScreenNormals;
 let modelFullScreenRenderBuffer;
 let modelFullScreenAddOne;
-let model1; //snow
-let model1InDepthTransform;
-let model1Lambertian;
+let modelSnow; //snow
+let modelSnowInDepthTransform;
+let modelTerrain;
 let model2; //agent1
 let model2InDepth;
 let model3; //agent2
 let model3InDepth;
 let modelCapsule;   //agent3
 let modelCapsuleInDepth;
+let modelArmadillo;   //agent3
+let modelArmadilloInDepth;
 let modelBootLeft;   //agent4
 let modelBootLeftInDepth;
 let modelBootRight;   //agent5
 let modelBootRightInDepth;
+let modelsToDraw = [];  // add function to automatically push models to draw and models for deforming snow
+let agentsToDraw = [];
 
-let snow_projection_plane;
 let snow_camera_matrix;
 let snow_projection_matrix;
 let snow_view_matrix;
@@ -81,25 +85,25 @@ let previous_height_scale = snow_height_scale;  //check if snow_height_scale has
 
 let heightMapFrameBuffer;
 let normalFrameBuffer;
-let rb;
+let renderBuffer;
 
 function init(canvas, gl) {
-    material1 = new Material(gl, vertexShaderSnow, fragmentShader);
+    materialSnow = new Material(gl, vertexShaderSnow, fragmentShader);
     materialLambertian = new Material(gl, vertexShader, fragmentShaderLambertian);
     materialDepth = new Material(gl, vertexShader, fragmentShaderDepth);
-    materialDepthHelper = new Material(gl, vertexShader, fragmentShaderDepthTransform);
+    materialSnowDepthInit = new Material(gl, vertexShader, fragmentShaderDepthTransform);
     materialDepthRenderBuffer = new Material(gl, vertexShaderNoTransform, fragmentShaderDepthRenderBuffer);
     modelFullScreenRenderBuffer = Model.createFullScreenModel(materialDepthRenderBuffer);
     materialGenerateNormals = new Material(gl, vertexShaderNoTransform, fragmentShaderRenderNormalsFromHeightMap);
     modelFullScreenNormals = Model.createFullScreenModel(materialGenerateNormals);
     materialAddOne = new Material(gl, vertexShaderNoTransform, fragmentShaderAddOne);
     modelFullScreenAddOne = Model.createFullScreenModel(materialAddOne);
-    model1 = new Model(material1);
-    model1Lambertian = new Model(materialLambertian);
-    model1InDepthTransform = new Model(materialDepthHelper);
-    // model1Lambertian.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0])
-    // model1Lambertian.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[0])
-    model1Lambertian.generateExampleModel();
+    modelSnow = new Model(materialSnow);
+    modelTerrain = new Model(materialLambertian);
+    modelSnowInDepthTransform = new Model(materialSnowDepthInit);
+    // modelTerrain.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0])
+    // modelTerrain.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[0])
+    modelTerrain.generateExampleModel();
 
     model2 = new Model(materialLambertian);
     model2InDepth = new Model(materialDepth);
@@ -112,6 +116,11 @@ function init(canvas, gl) {
     modelCapsuleInDepth = new Model(materialDepth);
     modelCapsuleInDepth.copyModel(modelCapsule);
 
+    modelArmadillo = new Model(materialLambertian);
+    modelArmadillo.copyModelInfo(createModelsFromOBJ(armadilloObj, {}, null)[0]);
+    modelArmadilloInDepth = new Model(materialDepth);
+    modelArmadilloInDepth.copyModel(modelArmadillo);
+
     modelBootLeft = new Model(materialLambertian);
     modelBootLeft.copyModelInfo(createModelsFromOBJ(bootObj, {}, null)[0]);
     modelBootLeftInDepth = new Model(materialDepth);
@@ -121,25 +130,25 @@ function init(canvas, gl) {
     modelBootRightInDepth = new Model(materialDepth);
     modelBootRightInDepth.copyModel(modelBootRight);
 
-    snow_projection_plane = new Model(materialDepth);
-    snow_projection_plane.center = new Vector3(0, 6, 0);
-    // snow_projection_plane.center = new Vector3(0, 0, 4);
-    // snow_projection_plane.center = new Vector3(0, 0, -4);
-    snow_projection_plane.generateFace(snow_projection_plane.center,
-        new Vector3(1, 0, 0), new Vector3(0, -0.00, 1),
-        // new Vector3(1, 1, 0), new Vector3(1, -1, -1),
-        // new Vector3(1, 1, 0), new Vector3(-1, 1, 1),
-        7, 7, 1
-    );
-    snow_projection_plane.computeNormals();
+    let snow_camera_tangent, snow_camera_bitangent, snow_camera_normal, snow_camera_position;
+    [
+        snow_camera_tangent,
+        snow_camera_bitangent,
+        snow_camera_position
+    ] = [
+        new Vector3(1, 0, 0), new Vector3(0, -0.00, 1), new Vector3(0, 6, 0)
+       // new Vector3(1, 1, 0), new Vector3(1, -1, -1), new Vector3(0, 0, 4)
+       // new Vector3(1, 1, 0), new Vector3(-1, 1, 1), new Vector3(0, 0, -4)
+    ];
+    snow_camera_normal = snow_camera_tangent.crossProduct(snow_camera_bitangent).normalize();
     snow_camera_matrix = math.identity(4);
     snow_camera_matrix = math.multiply(math.matrixFromColumns(
-        [snow_projection_plane.tangents[0], snow_projection_plane.tangents[1], snow_projection_plane.tangents[2], 0],
-        [-snow_projection_plane.bitangents[0], -snow_projection_plane.bitangents[1], -snow_projection_plane.bitangents[2], 0],
-        [-snow_projection_plane.normals[0], -snow_projection_plane.normals[1], -snow_projection_plane.normals[2], 0],
-        // [snow_projection_plane.center.toArray(), 1].flat(),
-        [snow_projection_plane.center.x, snow_projection_plane.center.y, snow_projection_plane.center.z, 1],
+        [...snow_camera_tangent.toArray(), 0],
+        [...snow_camera_bitangent.scale(-1).toArray(), 0],
+        [...snow_camera_normal.scale(-1).toArray(), 0],
+        [...snow_camera_position.toArray(), 1],
     ), snow_camera_matrix);
+    snow_view_matrix = math.inv(snow_camera_matrix);
 
     {
         model2.generateFace(
@@ -163,21 +172,22 @@ function init(canvas, gl) {
     model2.computeNormals();
     model2InDepth.copyModel(model2);
 
-    // model1.translate(0, -0.5, 2);
-    // model1Lambertian.scale(2, 0.6, 3);
-    // model1Lambertian.rotate(0.2, -0.5, 0.1);
-    // model1Lambertian.applyTransformMatrix();    // rotate, scale and skew has to be applied for lighting to be correct. The only exception is translation which don't have to be applied.
-    model1Lambertian.translate(0, -1.5, 0);
-    model1Lambertian.computeNormals(true);
-    model1.copyModel(model1Lambertian, false);  // create snow model
-    model1InDepthTransform.copyModel(model1);
-    snow_offset = new Vector3(...(math.transpose(snow_camera_matrix).valueOf()[2].slice(0, 3)));
+    // modelSnow.translate(0, -0.5, 2);
+    // modelTerrain.scale(2, 0.6, 3);
+    // modelTerrain.rotate(0.2, -0.5, 0.1);
+    // modelTerrain.applyTransformMatrix();    // rotate, scale and skew has to be applied for lighting to be correct. The only exception is translation which don't have to be applied.
+    modelTerrain.translate(0, -1.5, 0);
+    modelTerrain.computeNormals(true);
+    modelSnow.copyModel(modelTerrain, false);  // create snow model
+    modelSnowInDepthTransform.copyModel(modelSnow);
+    snow_offset = new Vector3(...(snow_view_matrix.valueOf()[2].slice(0, 3)));
     snow_offset.scale(snow_height_scale - 0.01);
-    model1.translate(...(snow_offset.toArray()));
+    modelSnow.translate(...(snow_offset.toArray()));
+    // modelSnow.translate(0, 0.5, 0);
 
-    mouseUniformLocation = gl.getUniformLocation(material1.program, "u_mouse");
-    // normalDetailTextureLocation = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
-    temporaryLocation_1 = gl.getUniformLocation(material1.program, "u_temp_use_the_occlusion");
+    mouseUniformLocation = gl.getUniformLocation(materialSnow.program, "u_mouse");
+    // normalDetailTextureLocation = gl.getUniformLocation(materialSnow.program, "u_normal_detail_texture");
+    temporaryLocation_1 = gl.getUniformLocation(materialSnow.program, "u_temp_use_the_occlusion");
 
     canvas.width = window.innerWidth / resolution;
     canvas.height = window.innerHeight / resolution;
@@ -191,20 +201,19 @@ function init(canvas, gl) {
 
     // snow_projection_matrix = orthographic_mtx(-4, 4, -4, 4, NEAR, FAR);
     snow_projection_matrix = orthographic_mtx(-8, 8, -8, 8, NEAR, FAR);
-    snow_view_matrix = math.inv(snow_camera_matrix);
     snow_view_projection = math.multiply(snow_projection_matrix, snow_view_matrix);
 
-    rb = gl.createRenderbuffer();
+    renderBuffer = gl.createRenderbuffer();
     heightMapFrameBuffer = gl.createFramebuffer();
     normalFrameBuffer = gl.createFramebuffer();
 
     // setup material uniforms
-    material1.location.texture.normal = gl.getUniformLocation(material1.program, "u_normal_texture");
-    material1.location.texture.color = gl.getUniformLocation(material1.program, "u_color_texture");
-    material1.location.texture.heightMap = gl.getUniformLocation(material1.program, "u_height_map_texture");
-    material1.location.texture.normalDetail = gl.getUniformLocation(material1.program, "u_normal_detail_texture");
-    material1.location.uniform.snowDirection = gl.getUniformLocation(material1.program, "u_snow_direction");
-    material1.location.uniform.height_scale = gl.getUniformLocation(material1.program, "u_height_scale");
+    materialSnow.location.texture.normal = gl.getUniformLocation(materialSnow.program, "u_normal_texture");
+    materialSnow.location.texture.color = gl.getUniformLocation(materialSnow.program, "u_color_texture");
+    materialSnow.location.texture.heightMap = gl.getUniformLocation(materialSnow.program, "u_height_map_texture");
+    // materialSnow.location.texture.normalDetail = gl.getUniformLocation(materialSnow.program, "u_normal_detail_texture");
+    materialSnow.location.uniform.snowDirection = gl.getUniformLocation(materialSnow.program, "u_snow_direction");
+    materialSnow.location.uniform.height_scale = gl.getUniformLocation(materialSnow.program, "u_height_scale");
 
     materialGenerateNormals.location.texture.heightMap = gl.getUniformLocation(materialGenerateNormals.program, "u_height_map_texture");
     materialGenerateNormals.location.uniform.slopeStrenth = gl.getUniformLocation(materialGenerateNormals.program, "u_slope_strength");
@@ -213,8 +222,8 @@ function init(canvas, gl) {
     materialAddOne.location.texture.heightMap = gl.getUniformLocation(materialAddOne.program, "u_height_map_texture");
     materialAddOne.location.uniform.height_scale = gl.getUniformLocation(materialAddOne.program, "u_height_scale");
 
-    materialDepthHelper.location.texture.reset = gl.getUniformLocation(materialDepthHelper.program, "u_height_map_texture");  //initial snow height map
-    /* height transform */ materialDepthHelper.location.texture.heightMap = gl.getUniformLocation(materialDepthHelper.program, "u_height_map_texture");  //initial snow height map
+    // materialSnowDepthInit.location.texture.reset = gl.getUniformLocation(materialSnowDepthInit.program, "u_height_map_texture");  // unused - when need to use, use gl.clear instead
+    /* height transform */ materialSnowDepthInit.location.texture.heightMap = gl.getUniformLocation(materialSnowDepthInit.program, "u_height_map_texture");  //initial snow height map
     /* result height */ materialDepth.location.texture.heightMap = gl.getUniformLocation(materialDepth.program, "u_height_map_texture");        //only at init?
     materialDepth.location.uniform.height_scale = gl.getUniformLocation(materialDepth.program, "u_height_scale");        //only at init?
     gl.useProgram(materialDepth.program);
@@ -223,76 +232,70 @@ function init(canvas, gl) {
     //load all images, then create image
     addImage("./height_map.png", (image) => {
         images["height_map"] = image;
-        addImage("./color.png", (image) => {
+        addImage("./simon-berger-WuVnejweXBw-unsplash.jpg", (image) => { // by Simon Berger from https://unsplash.com/photos/a-close-up-of-a-white-marble-surface-WuVnejweXBw
+        // addImage("./color.png", (image) => {
             images["color"] = image;
             addImage("./av53c33f80f8586a07900.png", (image) => {
                 images["normal_detail"] = image;
                 // TEXTURE id must be unique in program
                 // model can have different textures in different programs, even if the location name is the same, but their associated name be different
-                addTexture(model1, "normal", null,
-                    gl.TEXTURE1, material1.location.texture.normal, gl.RGBA, gl.RGBA, textureSize, textureSize, true);
-                addTexture(model1, "color", images["color"],
-                    gl.TEXTURE2, material1.location.texture.color, gl.RGBA, gl.RGBA);
-                addTexture(model1, "height_map_framebuffer", null,
-                    gl.TEXTURE3, material1.location.texture.heightMap, gl.RGBA, gl.RGBA, textureSize, textureSize, true);
-                addTexture(model1, "normal_detail", images["normal_detail"],
-                    gl.TEXTURE4, material1.location.texture.normalDetail, gl.RGBA, gl.RGBA);
-                addTexture(model1InDepthTransform, "height_map", images["height_map"],
-                    gl.TEXTURE1, materialDepthHelper.location.texture.heightMap, gl.RGBA, gl.RGBA);   //change to greyscale single channel or double channel normalized height and distance to surface
-                addTexture(model1InDepthTransform, "reset", new Uint8Array([255, 255, 255, 255]),
-                    gl.TEXTURE2, materialDepthHelper.location.texture.reset, gl.RGBA, gl.RGBA, 1, 1, true);   //change to greyscale single channel or double channel normalized height and distance to surface
-                addTexture(model1InDepthTransform, "height_transform_framebuffer", null,
+                addTexture(modelSnow, "normal", null,
+                    gl.TEXTURE1, materialSnow.location.texture.normal, gl.RGBA, gl.RGBA, textureSize, textureSize, true);
+                addTexture(modelSnow, "color", images["color"],
+                    gl.TEXTURE2, materialSnow.location.texture.color, gl.RGBA, gl.RGBA);
+                addTexture(modelSnow, "height_map_framebuffer", null,
+                    gl.TEXTURE3, materialSnow.location.texture.heightMap, gl.RGBA, gl.RGBA, textureSize, textureSize, true);
+                // addTexture(modelSnow, "normal_detail", images["normal_detail"],
+                //     gl.TEXTURE4, materialSnow.location.texture.normalDetail, gl.RGBA, gl.RGBA);
+                addTexture(modelSnowInDepthTransform, "height_map", images["height_map"],
+                    gl.TEXTURE1, materialSnowDepthInit.location.texture.heightMap, gl.RGBA, gl.RGBA);   //change to greyscale single channel or double channel normalized height and distance to surface
+                // addTexture(modelSnowInDepthTransform, "reset", new Uint8Array([255, 255, 255, 255]),
+                //     gl.TEXTURE2, materialSnowDepthInit.location.texture.reset, gl.RGBA, gl.RGBA, 1, 1, true); // unused - when need to use, use clear instead
+                addTexture(modelSnowInDepthTransform, "height_transform_framebuffer", null,
                     gl.TEXTURE1, materialDepth.location.texture.heightMap, gl.RGBA, gl.RGBA, textureSize, textureSize, true);   //change to greyscale single channel or double channel normalized height and distance to surface
-                gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+                gl.bindRenderbuffer(gl.RENDERBUFFER, renderBuffer);
                     gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, textureSize, textureSize)
                 gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
-                    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
-                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, model1.textures["height_map_framebuffer"].texture, 0);
+                    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, renderBuffer);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, modelSnow.textures["height_map_framebuffer"].texture, 0);
 
                 gl.bindFramebuffer(gl.FRAMEBUFFER, normalFrameBuffer);
-                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, model1.textures["normal"].texture, 0);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, modelSnow.textures["normal"].texture, 0);
 
                 //draw only once heightmap texture into height map frameBuffer
 
                 gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
                 gl.viewport(0, 0, textureSize, textureSize);
-                //draw moving actor and model in depth_buffer shader.
-                initModel(gl, model1InDepthTransform, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-                setTexture(gl, model1InDepthTransform.textures["height_map"]);
-                gl.drawArrays(gl.TRIANGLES, 0, model1InDepthTransform.positions.length / 3); //type, offset, count (position.length/size)
-                gl.bindTexture(gl.TEXTURE_2D, model1InDepthTransform.textures["height_transform_framebuffer"].texture)
-                gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
+                //draw snow model in depth_buffer shader.
+                overwriteSnowHeightMap(gl, snow_view_projection, snow_camera_matrix, snow_projection_matrix, snow_height_scale);
 
-                gl.colorMask(false, false, false, false);
-                gl.depthFunc(gl.ALWAYS); //overwrite depth buffer here
-                initModel(gl, modelFullScreenRenderBuffer, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-                gl.useProgram(materialDepthRenderBuffer.program);
-                gl.uniform1f(materialDepthRenderBuffer.location.uniform.height_scale, snow_height_scale);
-                gl.bindVertexArray(modelFullScreenRenderBuffer.VAO);
-                setTexture(gl, model1InDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialDepthRenderBuffer.location.texture.heightMap);
-                gl.drawArrays(gl.TRIANGLES, 0, 6);
-                gl.depthFunc(gl.LESS); //overwrite depth buffer here
-                gl.colorMask(true, true, true, true );
-
-                model1.material.location.attribute.texcoord_color = gl.getAttribLocation(model1.material.program, "a_texcoord_color");
-                model1.material.location.attribute.tangent_color = gl.getAttribLocation(model1.material.program, "a_tangents_color");
-                model1.material.location.attribute.bitangent_color = gl.getAttribLocation(model1.material.program, "a_bitangents_color");
-                model1.material.location.attribute.normal_color = gl.getAttribLocation(model1.material.program, "a_normals_color");
+                modelSnow.material.location.attribute.texcoord_color = gl.getAttribLocation(modelSnow.material.program, "a_texcoord_color");
+                modelSnow.material.location.attribute.tangent_color = gl.getAttribLocation(modelSnow.material.program, "a_tangents_color");
+                modelSnow.material.location.attribute.bitangent_color = gl.getAttribLocation(modelSnow.material.program, "a_bitangents_color");
+                // modelSnow.material.location.attribute.normal_color = gl.getAttribLocation(modelSnow.material.program, "a_normals_color");
                 //store texcoords and TBN for color and normal detail textures
-                model1.addAttribute(new Float32Array(model1.texcoords), model1.material.location.attribute.texcoord_color, 2);
-                model1.addAttribute(new Float32Array(model1.tangents), model1.material.location.attribute.tangent_color, 3);
-                model1.addAttribute(new Float32Array(model1.bitangents), model1.material.location.attribute.bitangent_color, 3);
-                model1.addAttribute(new Float32Array(model1.normals), model1.material.location.attribute.normal_color, 3);
+                modelSnow.material.location.attribute.color = gl.getAttribLocation(modelSnow.material.program, "a_color");
+                modelSnow.color = new Array(modelSnow.positions.length).fill(0).map((val, i) => {
+                    if (i % 9 < 3) { return Math.random(); }    // random color for every triangle
+                }).map((val, i, arr) => {
+                    if (i % 9 < 3) { return val; }
+                    else { return arr[i - Math.floor((i % 9) / 3) * 3]; }
+                });
+                modelSnow.addAttribute(new Float32Array(modelSnow.texcoords), modelSnow.material.location.attribute.texcoord_color, 2);
+                modelSnow.addAttribute(new Float32Array(modelSnow.tangents), modelSnow.material.location.attribute.tangent_color, 3);
+                modelSnow.addAttribute(new Float32Array(modelSnow.bitangents), modelSnow.material.location.attribute.bitangent_color, 3);
+                // /* unused */ modelSnow.addAttribute(new Float32Array(modelSnow.normals), modelSnow.material.location.attribute.normal_color, 3);
+                modelSnow.addAttribute(new Float32Array(modelSnow.color), modelSnow.material.location.attribute.color, 3);
 
-                model1.castTextureCoordsFromViewProjection(snow_view_projection);
+                modelSnow.castTextureCoordsFromViewProjection(snow_view_projection);
 
                 loop(canvas, gl);
             });
         });
     })
-    // // addTexture(model1, "./circuitry-detail-normal.png", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
-    // // addTexture(model1, "./9749-normal.jpg", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
-    // addTexture(model1, "./av53c33f80f8586a07900.png", gl.TEXTURE4, material1.location.texture.normalDetail, gl.RGBA, gl.RGBA);
+    // // addTexture(modelSnow, "./circuitry-detail-normal.png", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
+    // // addTexture(modelSnow, "./9749-normal.jpg", gl.TEXTURE4, normalDetailTextureLocation, gl.RGBA, gl.RGBA);
+    // addTexture(modelSnow, "./av53c33f80f8586a07900.png", gl.TEXTURE4, materialSnow.location.texture.normalDetail, gl.RGBA, gl.RGBA);
 }
 
 function loop(canvas, gl){
@@ -302,71 +305,47 @@ function loop(canvas, gl){
     let aspect_ratio = canvas.width / canvas.height;
     gl.viewport(0, 0, canvas.width, canvas.height);
 
-    // gl.bindVertexArray(model1.VAO);
+    // gl.bindVertexArray(modelSnow.VAO);
     // gl.uniform2f(mouseUniformLocation, mouseX, mouseY);
-    gl.useProgram(material1.program);
+    gl.useProgram(materialSnow.program);
     gl.uniform1i(temporaryLocation_1, parseFloat(mouseState[0]));
-    gl.uniform1f(material1.location.uniform.height_scale, snow_height_scale);
+    gl.uniform1f(materialSnow.location.uniform.height_scale, snow_height_scale);
     if (previous_height_scale !== snow_height_scale){    // refreshes render buffer - TODO: refresh render buffer, but make parallax look the same after changing height_scale
         previous_height_scale = snow_height_scale;
-        snow_offset = new Vector3(...(math.transpose(snow_camera_matrix).valueOf()[2].slice(0, 3)));
+        snow_offset = new Vector3(...(snow_view_matrix.valueOf()[2].slice(0, 3)));
         snow_offset.scale(snow_height_scale - 0.01);
-        console.log(model1InDepthTransform.getTranslation())
-        console.log(model1.getTranslation())
-        model1.translate(...math.multiply(model1.getTranslation(), -1).valueOf());
-        model1.translate(...(model1InDepthTransform.getTranslation().valueOf()));
-        model1.translate(...(model1Lambertian.getTranslation().valueOf()));
-        model1.translate(...(snow_offset.toArray()));   // snow is placed height_scale distance from the ground
+        modelSnow.translate(...math.multiply(modelSnow.getTranslation(), -1).valueOf());
+        modelSnow.translate(...(modelSnowInDepthTransform.getTranslation().valueOf()));
+        modelSnow.translate(...(modelTerrain.getTranslation().valueOf()));
+        modelSnow.translate(...(snow_offset.toArray()));   // snow is placed height_scale distance from the ground
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
         gl.viewport(0, 0, textureSize, textureSize);
-        gl.colorMask(false, false, false, false);
-        gl.depthFunc(gl.ALWAYS); //overwrite depth buffer
-        initModel(gl, modelFullScreenRenderBuffer, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-        gl.uniform1f(materialDepthRenderBuffer.location.uniform.height_scale, snow_height_scale);
-        setTexture(gl, model1InDepthTransform.textures["reset"], gl.TEXTURE1, materialDepthRenderBuffer.location.texture.heightMap);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);   //reset depth buffer
 
         gl.colorMask(false, true, true, false); //only update model distance
-        gl.depthFunc(gl.LESS); //overwrite fragment distance
-        //draw moving actor and model in depth_buffer shader.
-        initModel(gl, model1InDepthTransform, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-        setTexture(gl, model1InDepthTransform.textures["height_map"]);
-        gl.drawArrays(gl.TRIANGLES, 0, model1InDepthTransform.positions.length / 3); //type, offset, count (position.length/size)
-        gl.bindTexture(gl.TEXTURE_2D, model1InDepthTransform.textures["height_transform_framebuffer"].texture)
-        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
-
-        gl.colorMask(false, false, false, false);
-        gl.depthFunc(gl.ALWAYS); //overwrite depth buffer
-        initModel(gl, modelFullScreenRenderBuffer, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-        setTexture(gl, model1InDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialDepthRenderBuffer.location.texture.heightMap);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        gl.depthFunc(gl.LESS);  //return to defaults
-        gl.colorMask(true, true, true, true );
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        //draw snow model in depth_buffer shader.
+        overwriteSnowHeightMap(gl, snow_view_projection, snow_camera_matrix, snow_projection_matrix, snow_height_scale);
 
         gl.useProgram(materialDepth.program);
         gl.uniform1f(materialDepth.location.uniform.height_scale, snow_height_scale);
     }
 
-    if (Math.random() > 0.95) {
-    // if (Math.random() > 0.) {
+    if (Math.random() > 1.0) {
+    // if (Math.random() > 0.95) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
         gl.viewport(0, 0, textureSize, textureSize);
         gl.colorMask(true, false, false, false);
-        gl.depthFunc(gl.ALWAYS); //overwrite depth buffer here
+        gl.depthFunc(gl.ALWAYS);    // overwrite depth buffer
         gl.useProgram(materialAddOne.program);
         gl.uniform1f(materialAddOne.location.uniform.near, NEAR);
         gl.uniform1f(materialAddOne.location.uniform.far, FAR);
         gl.uniform1f(materialAddOne.location.uniform.height_scale, snow_height_scale);
         gl.bindVertexArray(modelFullScreenAddOne.VAO);
-        gl.bindTexture(gl.TEXTURE_2D, model1InDepthTransform.textures["height_transform_framebuffer"].texture)
+        gl.bindTexture(gl.TEXTURE_2D, modelSnowInDepthTransform.textures["height_transform_framebuffer"].texture)
         gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
-        setTexture(gl, model1InDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialAddOne.location.texture.heightMap);
+        setTexture(gl, modelSnowInDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialAddOne.location.texture.heightMap);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-        gl.depthFunc(gl.LESS); //overwrite depth buffer here
-        gl.colorMask(true, true, true, true );
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.depthFunc(gl.LESS);
     }
 
     model2.rotate(0, 0, 0.01);
@@ -376,6 +355,7 @@ function loop(canvas, gl){
     model3.rotate(0, 0, -0.18);
 
     modelCapsule.resetTransform();
+    modelArmadillo.resetTransform();
     modelBootLeft.resetTransform();
     modelBootRight.resetTransform();
     let capsuleDistance = new Vector3(6, 0, 0);
@@ -391,8 +371,11 @@ function loop(canvas, gl){
     modelBootRight.rotate(Date.now() / 400, 0, 0);
     modelBootLeft.translate(...bootDistanceLeft.toArray());
     modelBootRight.translate(...bootDistanceRight.toArray());
-    modelBootLeft.translate(0., boot_height + model1Lambertian.getTranslation()[1], 0.);
-    modelBootRight.translate(0., boot_height + model1Lambertian.getTranslation()[1], 0.);
+    modelBootLeft.translate(0., boot_height + modelTerrain.getTranslation()[1], 0.);
+    modelBootRight.translate(0., boot_height + modelTerrain.getTranslation()[1], 0.);
+    modelArmadillo.rotate(degToRad(90), 0, 0);
+    modelArmadillo.scale(0.02, 0.02, 0.02);
+    modelArmadillo.translate(0, math.sin((startTime - Date.now()) / 2000) + 0.5, 0);
     modelCapsule.translate(...capsuleDistance.toArray());
     modelCapsule.translate(0, -1., 0);
     modelCapsule.rotate(0, (startTime - Date.now()) / 2000, 0);
@@ -455,15 +438,11 @@ function loop(canvas, gl){
 
     let view_projection = math.multiply(projection_matrix, view_matrix);
 
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
     //draw heightMapFB to heightTransformFB
     gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
     gl.viewport(0, 0, textureSize, textureSize);
-    gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
-    // gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
 
-    gl.bindTexture(gl.TEXTURE_2D, model1InDepthTransform.textures["height_transform_framebuffer"].texture)
+    gl.bindTexture(gl.TEXTURE_2D, modelSnowInDepthTransform.textures["height_transform_framebuffer"].texture)
     gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
 
     gl.depthFunc(gl.GREATER);   // we want to find the deepest intersection with snow plane
@@ -473,48 +452,50 @@ function loop(canvas, gl){
     // using heightTransformFB draw agents in depth shader to heightMapFB
     gl.colorMask(true, false, false, false);    // only parallax height is updated - change if geometry has moved
     [
-        model2InDepth,
-        model3InDepth,
+        // model2InDepth,
+        // model3InDepth,
         modelCapsuleInDepth,
+        modelArmadilloInDepth,
         modelBootLeftInDepth,
         modelBootRightInDepth,
     ].forEach((model) => {
         initModel(gl, model, snow_view_projection, snow_camera_matrix, snow_projection_matrix, NEAR, FAR);
-        setTexture(gl, model1InDepthTransform.textures["height_transform_framebuffer"]);
+        setTexture(gl, modelSnowInDepthTransform.textures["height_transform_framebuffer"]);
         gl.drawArrays(gl.TRIANGLES, 0, model.positions.length / 3); //type, offset, count (position.length/size)
     })
-    gl.colorMask(true, true, true, true);
-    // gl.generateMipmap(gl.TEXTURE_2D);
     gl.depthFunc(gl.LESS);
     gl.enable(gl.CULL_FACE);
-    gl.enable(gl.BLEND);
+    gl.colorMask(true, true, true, true);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, normalFrameBuffer);  // generate normals
-    setTexture(gl, model1.textures["height_map_framebuffer"], gl.TEXTURE1);
-    // gl.viewport(0, 0, textureSize, textureSize); // unnecessary - same sized texture
     gl.useProgram(materialGenerateNormals.program); // draw normals as post processing effect
+    setTexture(gl, modelSnow.textures["height_map_framebuffer"], gl.TEXTURE1, materialGenerateNormals.location.texture.heightMap);
+    // gl.viewport(0, 0, textureSize, textureSize); // unnecessary - same sized texture
     gl.bindVertexArray(modelFullScreenNormals.VAO);
-    gl.uniform1f(materialGenerateNormals.location.uniform.slopeStrenth, textureSize / 7. * snow_height_scale); // good approximation of slope (picked by eye)
-    gl.drawArrays(gl.TRIANGLES, 0, 6);   // two coordinates per vertex
+    gl.uniform1f(materialGenerateNormals.location.uniform.slopeStrenth, textureSize * snow_height_scale);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    gl.useProgram(material1.program);
-    gl.uniform3f(material1.location.uniform.snowDirection,
-        // -snow_projection_plane.normals[0] + Math.cos(Date.now() / 200),
-        -snow_projection_plane.normals[0],
-        -snow_projection_plane.normals[1],
-        -snow_projection_plane.normals[2]);
+    gl.useProgram(materialSnow.program);
+    gl.uniform3f(materialSnow.location.uniform.snowDirection,
+        snow_camera_matrix.get([0, 2]),
+        snow_camera_matrix.get([1, 2]),
+        snow_camera_matrix.get([2, 2]));
+        // -snow_camera_matrix.get([2, 0]),
+        // -snow_camera_matrix.get([2, 1]),
+        // -snow_camera_matrix.get([2, 2]));
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    // gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     [
-        model1Lambertian,
-        model2,
-        model3,
+        modelTerrain,
+        modelSnow,
+        // model2,
+        // model3,
         modelCapsule,
+        modelArmadillo,
         modelBootLeft,
         modelBootRight,
-        model1,
     ].forEach((model) => {
         initModel(gl, model, view_projection, camera_matrix, projection_matrix, NEAR, FAR);
         for (let key in model.textures) {
@@ -543,12 +524,26 @@ function initModel(gl, model, view_projection, camera_matrix, projection_matrix,
     gl.uniform1f(model.material.location.uniform.near, near);
     gl.uniform1f(model.material.location.uniform.far, far);
 }
-function defaultState(gl){
+
+function overwriteSnowHeightMap(gl, view_projection, camera_matrix, projection_matrix, height_scale){
+    gl.clear(gl.DEPTH_BUFFER_BIT);  // overwrite depth buffer
+    initModel(gl, modelSnowInDepthTransform, view_projection, camera_matrix, projection_matrix, NEAR, FAR);
+    setTexture(gl, modelSnowInDepthTransform.textures["height_map"]);
+    gl.drawArrays(gl.TRIANGLES, 0, modelSnowInDepthTransform.positions.length / 3); //type, offset, count (position.length/size)
+    gl.bindTexture(gl.TEXTURE_2D, modelSnowInDepthTransform.textures["height_transform_framebuffer"].texture)
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, textureSize, textureSize);
+
+    gl.colorMask(false, false, false, false);
+    gl.depthFunc(gl.ALWAYS); //overwrite depth buffer
+    gl.useProgram(materialDepthRenderBuffer.program);
+    gl.bindVertexArray(modelFullScreenRenderBuffer.VAO);
+    gl.uniform1f(materialDepthRenderBuffer.location.uniform.near, NEAR);
+    gl.uniform1f(materialDepthRenderBuffer.location.uniform.far, FAR);
+    gl.uniform1f(materialDepthRenderBuffer.location.uniform.height_scale, height_scale);
+    setTexture(gl, modelSnowInDepthTransform.textures["height_transform_framebuffer"], gl.TEXTURE1, materialDepthRenderBuffer.location.texture.heightMap);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.depthFunc(gl.LESS);
-    gl.bindFramebuffer(null);
     gl.colorMask(true, true, true, true);
-    gl.enable(gl.CULL_FACE);
-    gl.enable(gl.BLEND);
 }
 
 function defineGlAttribute(name, value) {

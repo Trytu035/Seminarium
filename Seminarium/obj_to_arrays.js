@@ -372,10 +372,22 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
             triangles.colors.push(color_index);
             triangles.colors.push(color_index);
 
+            let automatically_determine_facing_direction = false;
             if (index_list[0][1] > -1) {
                 triangles.textures.push(index_list[0][1]);
                 triangles.textures.push(index_list[n][1]);
                 triangles.textures.push(index_list[n + 1][1]);
+            } else {
+                index_list[0][1] = index_list[0][0]
+                index_list[n][1] = index_list[n][0]
+                index_list[n + 1][1] = index_list[n + 1][0]
+                triangles.textures.push(index_list[0][1]);
+                triangles.textures.push(index_list[n][1]);
+                triangles.textures.push(index_list[n + 1][1]);
+                automatically_determine_facing_direction = true;
+                all_texture_coords[index_list[0][1]] = all_vertices[index_list[0][0]]
+                all_texture_coords[index_list[n][1]] = all_vertices[index_list[n][0]]
+                all_texture_coords[index_list[n + 1][1]] = all_vertices[index_list[n + 1][0]]
             }
 
             // The normal vectors are set:
@@ -412,6 +424,16 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                     vector.crossProduct(normal, edge1, edge2);
                     vector.normalize(normal);
 
+                    if (automatically_determine_facing_direction) {
+                        vector.crossProduct(temp, bitangent, tangent);
+                        vector.normalize(temp);
+                        if (vector.dotProduct(temp, normal) > 0) {
+                            let temporary_buffer = triangles.textures[triangles.textures.length - 1];
+                            triangles.textures[triangles.textures.length - 1] = triangles.textures[triangles.textures.length - 2];
+                            triangles.textures[triangles.textures.length - 2] = temporary_buffer;
+                        }
+                    }
+
                     all_tangents.push(tangent);
                     all_bitangents.push(bitangent);
                     all_normals.push(normal);
@@ -435,6 +457,12 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                     triangles.smooth_normals.push(-index_list[n][0]);
                     triangles.smooth_normals.push(-index_list[n + 1][0]);
                 } else {
+                    triangles.smooth_tangents.push(normal_index);
+                    triangles.smooth_tangents.push(normal_index);
+                    triangles.smooth_tangents.push(normal_index);
+                    triangles.smooth_bitangents.push(normal_index);
+                    triangles.smooth_bitangents.push(normal_index);
+                    triangles.smooth_bitangents.push(normal_index);
                     triangles.smooth_normals.push(normal_index);
                     triangles.smooth_normals.push(normal_index);
                     triangles.smooth_normals.push(normal_index);
@@ -650,9 +678,8 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
     }
 
     //-----------------------------------------------------------------------
-    function _smoothNormalIndexesToValues(indexes, source_data) {
+    function _smoothNormalIndexesToValues(indexes, source_data, alterative_data) {
         var j, k, n, array, size, index;
-
         if (indexes.length <= 0 || source_data === null || source_data.length <= 0) {
             return null;
         } else {
@@ -664,12 +691,12 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
 
                 if (index >= 0) {
                     for (k = 0; k < 3; k += 1, n += 1) {
-                        array[n] = all_normals[index][k];
+                        array[n] = source_data[index][k];
                     }
                 } else {
                     index = -index;
                     for (k = 0; k < 3; k += 1, n += 1) {
-                        array[n] = source_data[index][k];
+                        array[n] = alterative_data[index][k];
                     }
                 }
             }
@@ -701,9 +728,9 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                 triangles.vertices = _indexesToValues(triangles.vertices, all_vertices, 3);
                 triangles.colors = _indexesToValues(triangles.colors, all_colors, 3);
                 triangles.flat_normals = _indexesToValues(triangles.flat_normals, all_normals, 3);
-                triangles.smooth_tangents = _smoothNormalIndexesToValues(triangles.smooth_tangents, avg_tangents);
-                triangles.smooth_bitangents = _smoothNormalIndexesToValues(triangles.smooth_bitangents, avg_bitangents);
-                triangles.smooth_normals = _smoothNormalIndexesToValues(triangles.smooth_normals, avg_normals);
+                triangles.smooth_normals = _smoothNormalIndexesToValues(triangles.smooth_normals, all_normals, avg_normals);
+                triangles.smooth_tangents = _smoothNormalIndexesToValues(triangles.smooth_tangents, all_tangents, avg_tangents);
+                triangles.smooth_bitangents = _smoothNormalIndexesToValues(triangles.smooth_bitangents, all_bitangents, avg_bitangents);
                 triangles.textures = _indexesToValues(triangles.textures, all_texture_coords, 2);
                 current_model.all_texture_coords = all_texture_coords;
                 current_model.all_vertices = all_vertices;
@@ -982,6 +1009,8 @@ function smoothNormals(vertices, texcoords, triangles_indices) {
             console.log("This project supports only pretriangulated meshes. There may appear incorect lighting.");
         }
         let n = 1;
+        // multi triangles doesn't work, because in shader_interface only 3 vertices are considered
+        // until it's changed, it's needed for mesh to be pre-triangulated.
         while (n <= numberTriangles) {
             // if (true) {
             if (n === 1) {

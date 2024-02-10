@@ -26,7 +26,7 @@ class Model {
         this.bitangents = [];
         this.normals = [];
         this.model_matrix = new math.identity(4);
-        this.VAO = material.gl.createVertexArray(); //vertex attribute object
+        this.VAO = material?.gl.createVertexArray(); //vertex attribute object
         this.textures = [];
         // this.images = [];
         this.clones = [];   //list of clones which are copies of this model (mirrors it)
@@ -166,34 +166,36 @@ class Model {
         {
             this.flatNormals(this.positions, this.texcoords);
         }
-        let gl = this.material.gl;
+        let gl = this.material?.gl;
 
-        gl.bindVertexArray(this.VAO);
-        let positionsBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(this.material.location.attribute.position);
-        gl.vertexAttribPointer(this.material.location.attribute.position, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let texcoordsBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, texcoordsBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texcoords), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
-        gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let tangentsBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, tangentsBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.tangents), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(this.material.location.attribute.tangent);
-        gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let bitangentsBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, bitangentsBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.bitangents), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
-        gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
-        let normalsBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, normalsBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(this.material.location.attribute.normal);
-        gl.vertexAttribPointer(this.material.location.attribute.normal, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        if (gl !== undefined) {
+            gl.bindVertexArray(this.VAO);
+            let positionsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(this.material.location.attribute.position);
+            gl.vertexAttribPointer(this.material.location.attribute.position, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+            let texcoordsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texcoordsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texcoords), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(this.material.location.attribute.texcoord);
+            gl.vertexAttribPointer(this.material.location.attribute.texcoord, 2, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+            let tangentsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, tangentsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.tangents), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(this.material.location.attribute.tangent);
+            gl.vertexAttribPointer(this.material.location.attribute.tangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+            let bitangentsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, bitangentsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.bitangents), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(this.material.location.attribute.bitangent);
+            gl.vertexAttribPointer(this.material.location.attribute.bitangent, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+            let normalsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, normalsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(this.material.location.attribute.normal);
+            gl.vertexAttribPointer(this.material.location.attribute.normal, 3, gl.FLOAT, 0, 0, 0);//pointer, size, type, normalize, stride, offset
+        }
     }
 
     copyModel(other, trace) {   //copies data from other model to this model (should be used after flat normals are computed), or computeNormals would need to be called afterwards)
@@ -240,7 +242,7 @@ class Model {
     castTextureCoordsFromViewProjection(viewProjection) {
         this.material.gl.bindVertexArray(this.VAO);
         let MVP = math.multiply(viewProjection, this.model_matrix);
-        for (let i = 0; i < this.texcoords.length / 2; i++) {
+        for (let i = 0; i < this.texcoords.length / 2; i++) {   // iterate over mesh
             let position = math.matrix(
                 [this.positions[i*3], this.positions[i*3 + 1], this.positions[i*3 + 2], 1.0]
             );
@@ -250,7 +252,7 @@ class Model {
         }
         if (this.model_object !== undefined && this.model_object !== null) {
             let used = [];
-            for (let i = 0; i < this.model_object.all_triangles.length; i++) {
+            for (let i = 0; i < this.model_object.all_triangles.length; i++) {  // iterate over vertices of the mesh (for smooth shading)
                 for (let i2 = 0; i2 < this.model_object.all_triangles[i].length; i2++) {
                     let index = this.model_object.all_triangles[i][i2];
                     if (used.indexOf(index[1]) < 0) {
@@ -401,52 +403,52 @@ class Model {
         //     2, 2, 0.5
         //     // 2, 2, 1
         // );
-        this.generateFace(   // Y face (middle) bottom
-            new Vector3(0, 0, 0),
-            new Vector3(1, 0, 0), new Vector3(0, 0, 1),
-            2, 2, 1
-        );
-        this.generateFace(   //Z face back
-            new Vector3(0, 1, -1),
-            new Vector3(-1, 0, 0), new Vector3(0, 1, 0),
-            4, 4, 1
-            // texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
-            // 2, -2, 1, 1
-        );
-        this.generateFace(   //X face back
-            new Vector3(-1, 1, 0),
-            new Vector3(0, 0, 1), new Vector3(0, 1, 0), //inversed
-            2, 2, 1
-        );
-        this.generateFace(   //Z face front
-            new Vector3(0, 1, 1),
-            new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-            2, 2, 1
-            // texcoords, new Vector3(0, -1, 0), new Vector3(1, 0, 0),
-            // 2, -2, 1, 1
-        );
-        // this.generateFace(   // Z_X diagonal face side-right
-        //     new Vector3(2, 1, 0),
-        //     new Vector3(1, 0, -1).normalize(), new Vector3(0, 1, 0),
-        //     2*Math.sqrt(2), 2, 1
+        // this.generateFace(   // Y face (middle) bottom
+        //     new Vector3(0, 0, 0),
+        //     new Vector3(1, 0, 0), new Vector3(0, 0, 1),
+        //     2, 2, 1
         // );
-        this.generateFace(   //X face front
-            new Vector3(1, 1, 0),
-            new Vector3(0, 0, -1), new Vector3(0, 1, 0),
-            2, 2, 1
-        );
+        // this.generateFace(   //Z face back
+        //     new Vector3(0, 1, -1),
+        //     new Vector3(-1, 0, 0), new Vector3(0, 1, 0),
+        //     4, 4, 1
+        //     // texcoords, new Vector3(0, 1, 0), new Vector3(1, 0, 0),
+        //     // 2, -2, 1, 1
+        // );
+        // this.generateFace(   //X face back
+        //     new Vector3(-1, 1, 0),
+        //     new Vector3(0, 0, 1), new Vector3(0, 1, 0), //inversed
+        //     2, 2, 1
+        // );
+        // this.generateFace(   //Z face front
+        //     new Vector3(0, 1, 1),
+        //     new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+        //     2, 2, 1
+        //     // texcoords, new Vector3(0, -1, 0), new Vector3(1, 0, 0),
+        //     // 2, -2, 1, 1
+        // );
+        // // this.generateFace(   // Z_X diagonal face side-right
+        // //     new Vector3(2, 1, 0),
+        // //     new Vector3(1, 0, -1).normalize(), new Vector3(0, 1, 0),
+        // //     2*Math.sqrt(2), 2, 1
+        // // );
+        // this.generateFace(   //X face front
+        //     new Vector3(1, 1, 0),
+        //     new Vector3(0, 0, -1), new Vector3(0, 1, 0),
+        //     2, 2, 1
+        // );
 
         this.generateFace(   // Y face
             new Vector3(2, 0, 0),
             new Vector3(1, 0, 0), new Vector3(0, 0, -1),
             20, 20
         );
-
-        this.generateFace(
-            new Vector3(-2, 0, 0),
-            new Vector3(1, 1, 1), new Vector3(1, 1, -1),
-            2, 4
-        );
+        //
+        // this.generateFace(
+        //     new Vector3(-2, 0, 0),
+        //     new Vector3(1, 1, 1), new Vector3(1, 1, -1),
+        //     2, 4
+        // );
 
         // this.generateFace(
         //     new Vector3(1, -0.3, 0),
