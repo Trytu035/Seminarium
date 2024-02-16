@@ -13,8 +13,8 @@ void main(){
     float coarse = gl_FragCoord.z - fine / 256.0;
     
     output_FragColor = vec4(
-        0.0,
-        // texture(u_height_map_texture, v_texcoord).r,
+        // 0.0,
+        texture(u_height_map_texture, v_texcoord).r,
         coarse,     //depth coarse
         fine,       //depth fine
         1.0

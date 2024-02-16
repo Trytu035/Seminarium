@@ -1,4 +1,10 @@
 var fragmentShaderDepthRenderBuffer =`#version 300 es
+#extension GL_EXT_conservative_depth : enable
+
+// Ensure that the shader compiles when the extension is not supported
+#ifdef GL_EXT_conservative_depth
+    layout (depth_greater) out highp float gl_FragDepth;
+#endif
 /*************************************
  * only snow - used to transform other main parallax depth buffer shader
  *************************************/

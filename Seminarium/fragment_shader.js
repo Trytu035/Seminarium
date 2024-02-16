@@ -1,6 +1,14 @@
 var fragmentShader =`#version 300 es
 #define FRONT_FACE 1.0
 #define BACK_FACE -1.0
+#define PARALLAX_MAPPING_BINARY_SEARCH_ITERATIONS 8
+#define PARALLAX_MAPPING_NUMBER_OF_LINEAR_SEARCH_LAYERS 32.0
+#extension GL_EXT_conservative_depth : enable
+
+// Ensure that the shader compiles when the extension is not supported
+#ifdef GL_EXT_conservative_depth
+    layout (depth_greater) out highp float gl_FragDepth;
+#endif
 precision highp float;
 // precision lowp float;
 // precision highp int;
@@ -93,7 +101,14 @@ void main(){
     vec3 tangent_view_direction_color = world_view_direction * TBN_color; //tangent view direction
 
     float parallax_depth = ParallaxMapping(texcoord, tangent_view_direction, 0., u_height_scale, u_height_map_texture, FRONT_FACE);
-    float backface_parallax_depth = ParallaxMapping(texcoord, tangent_view_direction, parallax_depth, u_height_scale, u_height_map_texture, BACK_FACE);
+    float backface_parallax_depth = ParallaxMapping(
+        texcoord,
+        tangent_view_direction,
+        parallax_depth + 1.0 / PARALLAX_MAPPING_NUMBER_OF_LINEAR_SEARCH_LAYERS / pow(2., float(PARALLAX_MAPPING_BINARY_SEARCH_ITERATIONS - 2)),
+        u_height_scale,
+        u_height_map_texture,
+        BACK_FACE
+    );
 
     texcoord -= parallax_depth * tangent_view_direction.xy / tangent_view_direction.z * u_height_scale;
     texcoord_color -= parallax_depth * tangent_view_direction_color.xy / tangent_view_direction.z * u_height_scale;
@@ -137,6 +152,7 @@ void main(){
 	// output_FragColor = vec4(normalize(normals) /2. + 0.5, 1);
 	// output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 5000.0)), 1.);
 	// output_FragColor = vec4(vec3(pow(depth, 5000.0)), 1.);
+    // output_FragColor = vec4(vec3(length(frag_position - backface_frag_position)), 1);
 
 	// output_FragColor = vec4(vec3(v_color), 1);
 	// output_FragColor = vec4(vec3(v_texcoord.xy, 0.), 1);
@@ -192,8 +208,7 @@ float ParallaxMapping(vec2 texCoords, vec3 viewDir, float currentLayerDepth, flo
     // number of depth layers
     const float minLayers = 8.0;
     const float maxLayers = 32.0;
-    const float numLayers = 32.0;   //must be constant, my computer won't stand if it's not constant
-    const int binarySearchIterations = 8;
+    const float numLayers = PARALLAX_MAPPING_NUMBER_OF_LINEAR_SEARCH_LAYERS;   //must be constant, my computer won't stand if it's not constant
     // float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));    //doesn't work - will lag your computer
 
     float layerDepth = 1.0 / numLayers;
@@ -201,23 +216,23 @@ float ParallaxMapping(vec2 texCoords, vec3 viewDir, float currentLayerDepth, flo
     // the amount to shift the texture coordinates per layer (from vector P)
     vec2 P = viewDir.xy / viewDir.z * height_scale;
     vec2 deltaTexCoords = P / numLayers;
-    vec2 currentTexCoords = texCoords;
+    vec2 currentTexCoords = texCoords - currentLayerDepth * P;
     float currentDepthMapValue = texture(depthMap, currentTexCoords).r;
 
-    do {
+    while((currentLayerDepth - currentDepthMapValue) * seekBackface < 0. && currentLayerDepth < 1.){
         // shift texture coordinates along direction of P
         currentTexCoords -= deltaTexCoords;
         // get depthmap value at current texture coordinates
         currentDepthMapValue = texture(depthMap, currentTexCoords).r;
         // get depth of next layer
         currentLayerDepth += layerDepth;
-    } while((currentLayerDepth - currentDepthMapValue) * seekBackface < 0. && currentLayerDepth < 1.);
+    }
 
     // add binary search for relief mapping, based on - point 3 ↓↓↓
     // https://www.cs.purdue.edu/cgvlab/courses/434/434_Spring_2013/lectures/References/DepthImagesForRenderingSurfaceDetail.pdf
 
     float reliefScale = 1.;
-    for (int i = 0; i < binarySearchIterations; i++){
+    for (int i = 0; i < PARALLAX_MAPPING_BINARY_SEARCH_ITERATIONS; i++){
         reliefScale /= 2.;
 
         if ((currentLayerDepth - currentDepthMapValue) * seekBackface < 0.) {
@@ -248,6 +263,6 @@ float ParallaxMapping(vec2 texCoords, vec3 viewDir, float currentLayerDepth, flo
     currentLayerDepth = prevLayerDepth * weight + currentLayerDepth * (1.0 - weight);
     */
 
-    return currentLayerDepth;
+    return clamp(currentLayerDepth, 0., 1.);
 }
 `

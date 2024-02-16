@@ -1,4 +1,10 @@
 var fragmentShaderAddOne =`#version 300 es
+#extension GL_EXT_conservative_depth : enable
+
+// Ensure that the shader compiles when the extension is not supported
+#ifdef GL_EXT_conservative_depth
+    layout (depth_greater) out highp float gl_FragDepth;
+#endif
 precision highp float;
 in vec2 v_texcoord;
 uniform sampler2D u_height_map_texture;

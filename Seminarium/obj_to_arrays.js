@@ -358,7 +358,6 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
         while (sp.getIndexes(vertex_indexes)) {
             index_list.push(vertex_indexes.slice());
         }
-        current_model.all_triangles.push(index_list);
         // Create the face triangles.
         numberTriangles = index_list.length - 2;
         n = 1;
@@ -429,8 +428,8 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
                         vector.normalize(temp);
                         if (vector.dotProduct(temp, normal) > 0) {
                             let temporary_buffer = triangles.textures[triangles.textures.length - 1];
-                            triangles.textures[triangles.textures.length - 1] = triangles.textures[triangles.textures.length - 2];
-                            triangles.textures[triangles.textures.length - 2] = temporary_buffer;
+                            triangles.textures[triangles.textures.length - 1] = triangles.textures[triangles.textures.length - 3];
+                            triangles.textures[triangles.textures.length - 3] = temporary_buffer;
                         }
                     }
 
@@ -479,6 +478,8 @@ function createModelsFromOBJ(model_description, materials_dictionary, out) {
             // }
             n += 1; // if there is more than one triangle
         }
+        current_model.all_triangles.push(index_list);   // has to be placed after triangles.textures has been changed
+        // (won't work for smoothed texture coordinates, unless the model have had defined them on its own.)
     }
 
     //-----------------------------------------------------------------------

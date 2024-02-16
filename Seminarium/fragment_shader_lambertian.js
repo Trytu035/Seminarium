@@ -6,6 +6,7 @@ in vec3 v_normals;
 in float v_normalToCamera;
 in vec2 v_texcoord;
 in mat3 v_TBN;
+in vec3 v_color;
 // uniform sampler2D u_normal_texture;
 // uniform sampler2D u_normal_detail_texture;
 // uniform sampler2D u_height_map_texture;
@@ -54,6 +55,7 @@ void main(){
 	// output_FragColor = vec4(texture(u_normal_texture, texcoord).rgb*diffusion, 1);
 	// output_FragColor = texture(u_normal_texture, texcoord);
 	output_FragColor = vec4(vec3(0.5, 0., 1.) * diffusion, 1.);
+	// output_FragColor = vec4(vec3(v_color), 1);
 	// output_FragColor = vec4(vec3(pow(gl_FragCoord.z, 1.0)), 1);
     // output_FragColor = vec4(
     //     vec3(pow(

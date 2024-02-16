@@ -6,7 +6,7 @@ const FAR = 30.0;
 // const textureSize = 2048;
 const textureSize = 1024;
 // const textureSize = 256;
-let snow_height_scale = 1.2;
+let snow_height_scale = 1;
 
 function main() {
     /** @type {HTMLCanvasElement} */
@@ -88,6 +88,7 @@ let normalFrameBuffer;
 let renderBuffer;
 
 function init(canvas, gl) {
+    gl.getExtension('EXT_conservative_depth');
     materialSnow = new Material(gl, vertexShaderSnow, fragmentShader);
     materialLambertian = new Material(gl, vertexShader, fragmentShaderLambertian);
     materialDepth = new Material(gl, vertexShader, fragmentShaderDepth);
@@ -104,6 +105,12 @@ function init(canvas, gl) {
     // modelTerrain.copyModelInfo(createModelsFromOBJ(capsuleObj, {}, null)[0])
     // modelTerrain.copyModelInfo(createModelsFromOBJ(smoothPlaneObj, {}, null)[0])
     modelTerrain.generateExampleModel();
+    // modelTerrain.translate(0, -0.5, 2); // uncomment for smooth_plane object
+    // modelTerrain.scale(10, 2, 10);
+    // modelTerrain.scale(0.1, 0.1, 0.1);
+    // modelTerrain.rotate(0.2, -0.5, 0.1);
+    // modelTerrain.applyTransformMatrix();    // rotate, scale and skew has to be applied for lighting to be correct. The only exception is translation which don't have to be applied.
+    modelTerrain.translate(0, -1.5, 0);
 
     model2 = new Model(materialLambertian);
     model2InDepth = new Model(materialDepth);
@@ -136,7 +143,7 @@ function init(canvas, gl) {
         snow_camera_bitangent,
         snow_camera_position
     ] = [
-        new Vector3(1, 0, 0), new Vector3(0, -0.00, 1), new Vector3(0, 6, 0)
+        new Vector3(1, 0, 0), new Vector3(0, -0.00, 1), new Vector3(0, 10, 0)
        // new Vector3(1, 1, 0), new Vector3(1, -1, -1), new Vector3(0, 0, 4)
        // new Vector3(1, 1, 0), new Vector3(-1, 1, 1), new Vector3(0, 0, -4)
     ];
@@ -172,11 +179,6 @@ function init(canvas, gl) {
     model2.computeNormals();
     model2InDepth.copyModel(model2);
 
-    // modelSnow.translate(0, -0.5, 2);
-    // modelTerrain.scale(2, 0.6, 3);
-    // modelTerrain.rotate(0.2, -0.5, 0.1);
-    // modelTerrain.applyTransformMatrix();    // rotate, scale and skew has to be applied for lighting to be correct. The only exception is translation which don't have to be applied.
-    modelTerrain.translate(0, -1.5, 0);
     modelTerrain.computeNormals(true);
     modelSnow.copyModel(modelTerrain, false);  // create snow model
     modelSnowInDepthTransform.copyModel(modelSnow);
@@ -275,17 +277,12 @@ function init(canvas, gl) {
                 // modelSnow.material.location.attribute.normal_color = gl.getAttribLocation(modelSnow.material.program, "a_normals_color");
                 //store texcoords and TBN for color and normal detail textures
                 modelSnow.material.location.attribute.color = gl.getAttribLocation(modelSnow.material.program, "a_color");
-                modelSnow.color = new Array(modelSnow.positions.length).fill(0).map((val, i) => {
-                    if (i % 9 < 3) { return Math.random(); }    // random color for every triangle
-                }).map((val, i, arr) => {
-                    if (i % 9 < 3) { return val; }
-                    else { return arr[i - Math.floor((i % 9) / 3) * 3]; }
-                });
+                randomColorVertices(gl, modelSnow, "a_color");
+                // randomColorVertices(gl, modelCapsule, "a_color");
                 modelSnow.addAttribute(new Float32Array(modelSnow.texcoords), modelSnow.material.location.attribute.texcoord_color, 2);
                 modelSnow.addAttribute(new Float32Array(modelSnow.tangents), modelSnow.material.location.attribute.tangent_color, 3);
                 modelSnow.addAttribute(new Float32Array(modelSnow.bitangents), modelSnow.material.location.attribute.bitangent_color, 3);
                 // /* unused */ modelSnow.addAttribute(new Float32Array(modelSnow.normals), modelSnow.material.location.attribute.normal_color, 3);
-                modelSnow.addAttribute(new Float32Array(modelSnow.color), modelSnow.material.location.attribute.color, 3);
 
                 modelSnow.castTextureCoordsFromViewProjection(snow_view_projection);
 
@@ -330,8 +327,8 @@ function loop(canvas, gl){
         gl.uniform1f(materialDepth.location.uniform.height_scale, snow_height_scale);
     }
 
-    if (Math.random() > 1.0) {
-    // if (Math.random() > 0.95) {
+    // if (Math.random() > 1.0) {
+    if (Math.random() > 0.90) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, heightMapFrameBuffer);
         gl.viewport(0, 0, textureSize, textureSize);
         gl.colorMask(true, false, false, false);
@@ -375,7 +372,7 @@ function loop(canvas, gl){
     modelBootRight.translate(0., boot_height + modelTerrain.getTranslation()[1], 0.);
     modelArmadillo.rotate(degToRad(90), 0, 0);
     modelArmadillo.scale(0.02, 0.02, 0.02);
-    modelArmadillo.translate(0, math.sin((startTime - Date.now()) / 2000) + 0.5, 0);
+    modelArmadillo.translate(0, math.sin((startTime - Date.now()) / 2000) + 0.3, 0);
     modelCapsule.translate(...capsuleDistance.toArray());
     modelCapsule.translate(0, -1., 0);
     modelCapsule.rotate(0, (startTime - Date.now()) / 2000, 0);
@@ -452,10 +449,10 @@ function loop(canvas, gl){
     // using heightTransformFB draw agents in depth shader to heightMapFB
     gl.colorMask(true, false, false, false);    // only parallax height is updated - change if geometry has moved
     [
-        // model2InDepth,
-        // model3InDepth,
-        modelCapsuleInDepth,
+        model2InDepth,
+        model3InDepth,
         modelArmadilloInDepth,
+        modelCapsuleInDepth,
         modelBootLeftInDepth,
         modelBootRightInDepth,
     ].forEach((model) => {
@@ -490,10 +487,10 @@ function loop(canvas, gl){
     [
         modelTerrain,
         modelSnow,
-        // model2,
-        // model3,
-        modelCapsule,
+        model2,
+        model3,
         modelArmadillo,
+        modelCapsule,
         modelBootLeft,
         modelBootRight,
     ].forEach((model) => {
@@ -544,6 +541,17 @@ function overwriteSnowHeightMap(gl, view_projection, camera_matrix, projection_m
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.depthFunc(gl.LESS);
     gl.colorMask(true, true, true, true);
+}
+
+function randomColorVertices(gl, model, attributeName){
+    model.material.location.attribute.color = gl.getAttribLocation(model.material.program, attributeName);
+    model.color = new Array(model.positions.length).fill(0).map((val, i) => {
+        if (i % 9 < 3) { return Math.random(); }    // random color for every triangle
+    }).map((val, i, arr) => {
+        if (i % 9 < 3) { return val; }
+        else { return arr[i - Math.floor((i % 9) / 3) * 3]; }
+    });
+    model.addAttribute(new Float32Array(model.color), model.material.location.attribute.color, 3);
 }
 
 function defineGlAttribute(name, value) {
